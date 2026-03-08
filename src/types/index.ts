@@ -7,6 +7,7 @@ export type User = {
   username: string
   displayName: string
   createdAt: string
+  updatedAt: string
 }
 
 export type PaymentFrequency = 'weekly' | 'biweekly' | 'monthly'
