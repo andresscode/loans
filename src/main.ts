@@ -6,7 +6,7 @@ import {
   searchBorrowersByName,
 } from './database/borrowers'
 import { closeDatabase, getDb, initDatabase } from './database/index'
-import { createLoan } from './database/loans'
+import { createLoan, getAllLoansWithBorrowers } from './database/loans'
 import { createSession, validateSession } from './database/sessions'
 import { authenticateUser, createUser, getUserCount } from './database/users'
 
@@ -81,6 +81,33 @@ function registerIpcHandlers() {
       },
     }
   })
+
+  ipcMain.handle(
+    'loans:get-all',
+    (_event, params: { page: number; pageSize: number }) => {
+      const { rows, total } = getAllLoansWithBorrowers(
+        params.page,
+        params.pageSize,
+      )
+      return {
+        data: rows.map((row) => ({
+          id: row.id,
+          borrowerId: row.borrower_id,
+          amount: row.amount,
+          interestRate: row.interest_rate,
+          paymentFrequency: row.payment_frequency,
+          startDate: row.start_date,
+          dueDate: row.due_date,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          borrowerName: row.borrower_name,
+        })),
+        total,
+        page: params.page,
+        pageSize: params.pageSize,
+      }
+    },
+  )
 
   ipcMain.handle('loans:search-borrowers', (_event, query: string) => {
     const rows = searchBorrowersByName(query)

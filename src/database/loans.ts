@@ -65,6 +65,29 @@ export function getAllLoans(): LoanRow[] {
     .all() as LoanRow[]
 }
 
+type LoanRowWithBorrower = LoanRow & { borrower_name: string }
+
+export function getAllLoansWithBorrowers(
+  page: number,
+  pageSize: number,
+): { rows: LoanRowWithBorrower[]; total: number } {
+  const db = getDb()
+  const { total } = db.prepare('SELECT COUNT(*) AS total FROM loans').get() as {
+    total: number
+  }
+  const offset = (page - 1) * pageSize
+  const rows = db
+    .prepare(
+      `SELECT loans.*, borrowers.name AS borrower_name
+       FROM loans
+       INNER JOIN borrowers ON loans.borrower_id = borrowers.id
+       ORDER BY loans.created_at DESC
+       LIMIT ? OFFSET ?`,
+    )
+    .all(pageSize, offset) as LoanRowWithBorrower[]
+  return { rows, total }
+}
+
 export function updateLoan(
   id: number,
   data: {

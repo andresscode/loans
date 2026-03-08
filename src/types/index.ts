@@ -49,8 +49,21 @@ export type CreateLoanInput = {
   dueDate: string
 }
 
+export type PaginatedResult<T> = {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export type LoanWithBorrower = Loan & { borrowerName: string }
+
 export type LoansApi = {
   create: (data: CreateLoanInput) => Promise<ActionResult<Loan>>
+  getAll: (params: {
+    page: number
+    pageSize: number
+  }) => Promise<PaginatedResult<LoanWithBorrower>>
   searchBorrowers: (query: string) => Promise<Borrower[]>
 }
 
