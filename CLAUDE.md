@@ -36,5 +36,5 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Path alias:** `@/` maps to `src/` (configured in both tsconfig.json and vite.config.ts)
 - **UI components:** shadcn/ui v4 with radix-nova style, Tailwind CSS v4, lucide-react icons
-- **Package manager:** pnpm (workspace enabled)
+- **Package manager:** pnpm only. NEVER use npm, npx, or yarn.
 - **ActionResult pattern:** Services return `ActionResult<T>` — a discriminated union of `{ success: true, data: T }` or `{ success: false, error: string }`
