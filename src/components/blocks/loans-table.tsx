@@ -1,5 +1,30 @@
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  EllipsisVerticalIcon,
+  PencilIcon,
+  TrashIcon,
+} from 'lucide-react'
+import { useState } from 'react'
+import { EditLoanForm } from '@/components/blocks/edit-loan-form'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Dialog } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Table,
   TableBody,
@@ -8,7 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import type { LoanWithBorrower } from '@/types'
+import type { LoanWithBorrower, UpdateLoanInput } from '@/types'
 
 const frequencyLabels: Record<string, string> = {
   weekly: 'Semanal',
@@ -39,6 +64,8 @@ type LoansTableProps = {
   page: number
   pageSize: number
   onPageChange: (page: number) => void
+  onEdit: (id: number, data: UpdateLoanInput) => Promise<boolean>
+  onDelete: (id: number) => Promise<boolean>
 }
 
 export function LoansTable({
@@ -47,10 +74,48 @@ export function LoansTable({
   page,
   pageSize,
   onPageChange,
+  onEdit,
+  onDelete,
 }: LoansTableProps) {
   const totalPages = Math.ceil(total / pageSize)
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, total)
+
+  const [editingLoan, setEditingLoan] = useState<LoanWithBorrower | null>(null)
+  const [deletingLoan, setDeletingLoan] = useState<LoanWithBorrower | null>(
+    null,
+  )
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  async function handleEdit(data: UpdateLoanInput) {
+    if (!editingLoan) return
+    setIsSubmitting(true)
+    setEditError(null)
+    try {
+      const success = await onEdit(editingLoan.id, data)
+      if (success) {
+        setEditingLoan(null)
+      } else {
+        setEditError('Error al actualizar el prestamo')
+      }
+    } catch {
+      setEditError('Error inesperado al actualizar el prestamo')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!deletingLoan) return
+    setIsSubmitting(true)
+    try {
+      await onDelete(deletingLoan.id)
+    } finally {
+      setIsSubmitting(false)
+      setDeletingLoan(null)
+    }
+  }
 
   if (total === 0) {
     return (
@@ -77,6 +142,7 @@ export function LoansTable({
               <TableHead>Frecuencia</TableHead>
               <TableHead>Fecha de inicio</TableHead>
               <TableHead>Fecha de vencimiento</TableHead>
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -100,6 +166,33 @@ export function LoansTable({
                 </TableCell>
                 <TableCell className="tabular-nums">
                   {formatDate(loan.dueDate)}
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon-sm">
+                        <EllipsisVerticalIcon />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setEditError(null)
+                          setEditingLoan(loan)
+                        }}
+                      >
+                        <PencilIcon />
+                        Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={() => setDeletingLoan(loan)}
+                      >
+                        <TrashIcon />
+                        Eliminar
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}
@@ -130,6 +223,59 @@ export function LoansTable({
           </Button>
         </div>
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog
+        open={editingLoan !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingLoan(null)
+            setEditError(null)
+          }
+        }}
+      >
+        {editingLoan && (
+          <EditLoanForm
+            loan={editingLoan}
+            isSubmitting={isSubmitting}
+            error={editError}
+            onSubmit={handleEdit}
+          />
+        )}
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog
+        open={deletingLoan !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeletingLoan(null)
+        }}
+      >
+        {deletingLoan && (
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminar prestamo</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta accion no se puede deshacer. Se eliminará el prestamo de{' '}
+                {deletingLoan.borrowerName} por{' '}
+                {formatCurrency(deletingLoan.amount)}.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isSubmitting}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={isSubmitting}
+                onClick={handleDelete}
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        )}
+      </AlertDialog>
     </div>
   )
 }

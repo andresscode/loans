@@ -6,7 +6,12 @@ import {
   searchBorrowersByName,
 } from './database/borrowers'
 import { closeDatabase, getDb, initDatabase } from './database/index'
-import { createLoan, getAllLoansWithBorrowers } from './database/loans'
+import {
+  createLoan,
+  deleteLoan,
+  getAllLoansWithBorrowers,
+  updateLoan,
+} from './database/loans'
 import { createSession, validateSession } from './database/sessions'
 import { authenticateUser, createUser, getUserCount } from './database/users'
 
@@ -191,6 +196,62 @@ function registerIpcHandlers() {
       }
     },
   )
+
+  ipcMain.handle(
+    'loans:update',
+    (
+      _event,
+      data: {
+        id: number
+        amount: number
+        interestRate: number
+        paymentFrequency: string
+        startDate: string
+        dueDate: string
+      },
+    ) => {
+      try {
+        const row = updateLoan(data.id, {
+          amount: data.amount,
+          interestRate: data.interestRate,
+          paymentFrequency: data.paymentFrequency,
+          startDate: data.startDate,
+          dueDate: data.dueDate,
+        })
+        if (!row) {
+          return { success: false, error: 'El préstamo no existe' }
+        }
+        return {
+          success: true,
+          data: {
+            id: row.id,
+            borrowerId: row.borrower_id,
+            amount: row.amount,
+            interestRate: row.interest_rate,
+            paymentFrequency: row.payment_frequency,
+            startDate: row.start_date,
+            dueDate: row.due_date,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          },
+        }
+      } catch {
+        return { success: false, error: 'Error al actualizar el préstamo' }
+      }
+    },
+  )
+
+  ipcMain.handle('loans:delete', (_event, id: number) => {
+    try {
+      const deleted = deleteLoan(id)
+      if (!deleted) {
+        return { success: false, error: 'El préstamo no existe' }
+      }
+      return { success: true }
+    } catch {
+      return { success: false, error: 'Error al eliminar el préstamo' }
+    }
+  })
 }
 
 function createWindow() {

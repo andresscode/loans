@@ -22,6 +22,17 @@ contextBridge.exposeInMainWorld('api', {
       startDate: string
       dueDate: string
     }) => ipcRenderer.invoke('loans:create', data),
+    update: (
+      id: number,
+      data: {
+        amount: number
+        interestRate: number
+        paymentFrequency: string
+        startDate: string
+        dueDate: string
+      },
+    ) => ipcRenderer.invoke('loans:update', { id, ...data }),
+    delete: (id: number) => ipcRenderer.invoke('loans:delete', id),
     getAll: (params: { page: number; pageSize: number }) =>
       ipcRenderer.invoke('loans:get-all', params),
     searchBorrowers: (query: string) =>

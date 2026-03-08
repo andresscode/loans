@@ -6,7 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { useAuth } from '@/contexts/auth-context'
 import { loansService } from '@/services/loans'
-import type { CreateLoanInput, LoanWithBorrower } from '@/types'
+import type {
+  CreateLoanInput,
+  LoanWithBorrower,
+  UpdateLoanInput,
+} from '@/types'
 
 export function HomePage() {
   const { user, logout } = useAuth()
@@ -48,6 +52,27 @@ export function HomePage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  async function handleEditLoan(
+    id: number,
+    data: UpdateLoanInput,
+  ): Promise<boolean> {
+    const result = await loansService.update(id, data)
+    if (result.success) {
+      refresh()
+      return true
+    }
+    return false
+  }
+
+  async function handleDeleteLoan(id: number): Promise<boolean> {
+    const result = await loansService.delete(id)
+    if (result.success) {
+      refresh()
+      return true
+    }
+    return false
   }
 
   return (
@@ -100,6 +125,8 @@ export function HomePage() {
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}
+          onEdit={handleEditLoan}
+          onDelete={handleDeleteLoan}
         />
       </main>
     </div>
