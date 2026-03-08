@@ -1,9 +1,12 @@
 import "./global.css";
+import { LoginForm } from "@/components/blocks/login-form";
 
 export default function App() {
   return (
-    <div className="min-h-svh flex items-center justify-center">
-      <h1 className="text-4xl font-medium">Hello, World!</h1>
+    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+      <div className="w-full max-w-sm">
+        <LoginForm />
+      </div>
     </div>
   );
 }
