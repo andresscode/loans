@@ -1,5 +1,5 @@
 import { LogOutIcon, PlusIcon } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useReducer, useState } from 'react'
 import { LoanForm } from '@/components/blocks/loan-form'
 import { LoansTable } from '@/components/blocks/loans-table'
 import { Button } from '@/components/ui/button'
@@ -13,16 +13,19 @@ export function HomePage() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
   const [loans, setLoans] = useState<LoanWithBorrower[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [refreshToken, refresh] = useReducer((x: number) => x + 1, 0)
   const pageSize = 10
 
   const fetchLoans = useCallback(async () => {
+    void refreshToken
     const result = await loansService.getAll(page, pageSize)
     setLoans(result.data)
     setTotal(result.total)
-  }, [page])
+  }, [page, refreshToken])
 
   useEffect(() => {
     fetchLoans()
@@ -30,13 +33,18 @@ export function HomePage() {
 
   async function handleCreateLoan(data: CreateLoanInput) {
     setIsSubmitting(true)
+    setFormError(null)
     try {
       const result = await loansService.create(data)
       if (result.success) {
         setDialogOpen(false)
         setPage(1)
-        fetchLoans()
+        refresh()
+      } else {
+        setFormError(result.error)
       }
+    } catch {
+      setFormError('Error inesperado al crear el prestamo. Intenta de nuevo.')
     } finally {
       setIsSubmitting(false)
     }
@@ -64,7 +72,13 @@ export function HomePage() {
         {/* Subheader */}
         <div className="mb-5 flex items-center justify-between">
           <h2 className="font-semibold text-lg tracking-tight">Prestamos</h2>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog
+            open={dialogOpen}
+            onOpenChange={(open) => {
+              setDialogOpen(open)
+              if (!open) setFormError(null)
+            }}
+          >
             <Button size="sm" onClick={() => setDialogOpen(true)}>
               <PlusIcon />
               Nuevo prestamo
@@ -72,6 +86,7 @@ export function HomePage() {
             {dialogOpen && (
               <LoanForm
                 isSubmitting={isSubmitting}
+                error={formError}
                 onSubmit={handleCreateLoan}
               />
             )}
