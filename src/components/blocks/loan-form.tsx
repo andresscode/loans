@@ -285,6 +285,7 @@ export function LoanForm({ isSubmitting, error, onSubmit }: LoanFormProps) {
                     mode="single"
                     selected={dueDate}
                     onSelect={setDueDate}
+                    defaultMonth={dueDate}
                     locale={es}
                     disabled={startDate ? { before: startDate } : undefined}
                   />

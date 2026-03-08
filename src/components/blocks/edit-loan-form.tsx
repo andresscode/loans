@@ -266,6 +266,7 @@ export function EditLoanForm({
                     mode="single"
                     selected={dueDate}
                     onSelect={setDueDate}
+                    defaultMonth={dueDate}
                     locale={es}
                     disabled={startDate ? { before: startDate } : undefined}
                   />
