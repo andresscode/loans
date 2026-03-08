@@ -4,10 +4,10 @@
 #   https://lefthook.dev/configuration/
 #
 
-#commit-msg:
-#  commands:
-#    commitlint:
-#      run: pnpm dlx commitlint --edit $1
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm dlx commitlint --edit $1
 
 pre-commit:
   commands:
