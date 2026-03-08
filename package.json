@@ -5,7 +5,8 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "tsc -p tsconfig.node.json && concurrently \"vite\" \"wait-on tcp:5173 && electron .\"",
-    "build": "tsc -p tsconfig.node.json && tsc && vite build"
+    "build": "tsc -p tsconfig.node.json && tsc && vite build",
+    "check": "tsc --noEmit"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",
