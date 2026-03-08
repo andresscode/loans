@@ -21,5 +21,7 @@ pre-commit:
 
 pre-push:
   commands:
+    test:
+      run: pnpm test
     build:
       run: pnpm build

@@ -1,6 +1,6 @@
 import { CalculatorIcon } from 'lucide-react'
 import { useMemo } from 'react'
-import { calculateLoan, copFormatter } from '@/lib/loan-calculations'
+import { calculateLoan, copFormatter } from '@/lib/loan-math'
 
 type LoanCalculatorProps = {
   amount: number | null

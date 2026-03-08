@@ -35,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { formatCOP } from '@/lib/loan-calculations'
+import { formatCOP } from '@/lib/loan-math'
 import { cn } from '@/lib/utils'
 import type { CreateLoanInput, PaymentFrequency } from '@/types'
 

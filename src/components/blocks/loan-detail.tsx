@@ -40,7 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { formatCOP } from '@/lib/loan-calculations'
+import { formatCOP } from '@/lib/loan-math'
 import { cn } from '@/lib/utils'
 import { loansService } from '@/services/loans'
 import type { LoanWithBorrower, Payment } from '@/types'
