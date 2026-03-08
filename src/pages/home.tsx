@@ -127,6 +127,7 @@ export function HomePage() {
           onPageChange={setPage}
           onEdit={handleEditLoan}
           onDelete={handleDeleteLoan}
+          onPaymentChange={refresh}
         />
       </main>
     </div>

@@ -2,9 +2,11 @@ import type {
   ActionResult,
   Borrower,
   CreateLoanInput,
+  CreatePaymentInput,
   Loan,
   LoanWithBorrower,
   PaginatedResult,
+  Payment,
   UpdateLoanInput,
 } from '@/types'
 
@@ -30,5 +32,19 @@ export const loansService = {
 
   async searchBorrowers(query: string): Promise<Borrower[]> {
     return window.api.loans.searchBorrowers(query)
+  },
+
+  async getPayments(loanId: number): Promise<Payment[]> {
+    return window.api.loans.getPayments(loanId)
+  },
+
+  async createPayment(
+    data: CreatePaymentInput,
+  ): Promise<ActionResult<Payment>> {
+    return window.api.loans.createPayment(data)
+  },
+
+  async deletePayment(id: number): Promise<ActionResult> {
+    return window.api.loans.deletePayment(id)
   },
 }

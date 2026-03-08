@@ -37,5 +37,14 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('loans:get-all', params),
     searchBorrowers: (query: string) =>
       ipcRenderer.invoke('loans:search-borrowers', query),
+    getPayments: (loanId: number) =>
+      ipcRenderer.invoke('loans:get-payments', loanId),
+    createPayment: (data: {
+      loanId: number
+      amount: number
+      paymentDate: string
+    }) => ipcRenderer.invoke('loans:create-payment', data),
+    deletePayment: (id: number) =>
+      ipcRenderer.invoke('loans:delete-payment', id),
   },
 })

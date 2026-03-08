@@ -2,11 +2,13 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   EllipsisVerticalIcon,
+  EyeIcon,
   PencilIcon,
   TrashIcon,
 } from 'lucide-react'
 import { useState } from 'react'
 import { EditLoanForm } from '@/components/blocks/edit-loan-form'
+import { LoanDetail } from '@/components/blocks/loan-detail'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,6 +68,7 @@ type LoansTableProps = {
   onPageChange: (page: number) => void
   onEdit: (id: number, data: UpdateLoanInput) => Promise<boolean>
   onDelete: (id: number) => Promise<boolean>
+  onPaymentChange?: () => void
 }
 
 export function LoansTable({
@@ -76,11 +79,15 @@ export function LoansTable({
   onPageChange,
   onEdit,
   onDelete,
+  onPaymentChange,
 }: LoansTableProps) {
   const totalPages = Math.ceil(total / pageSize)
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, total)
 
+  const [selectedLoan, setSelectedLoan] = useState<LoanWithBorrower | null>(
+    null,
+  )
   const [editingLoan, setEditingLoan] = useState<LoanWithBorrower | null>(null)
   const [deletingLoan, setDeletingLoan] = useState<LoanWithBorrower | null>(
     null,
@@ -147,7 +154,11 @@ export function LoansTable({
           </TableHeader>
           <TableBody>
             {loans.map((loan) => (
-              <TableRow key={loan.id}>
+              <TableRow
+                key={loan.id}
+                className="cursor-pointer"
+                onClick={() => setSelectedLoan(loan)}
+              >
                 <TableCell className="font-medium">
                   {loan.borrowerName}
                 </TableCell>
@@ -167,7 +178,7 @@ export function LoansTable({
                 <TableCell className="tabular-nums">
                   {formatDate(loan.dueDate)}
                 </TableCell>
-                <TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon-sm">
@@ -175,6 +186,10 @@ export function LoansTable({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => setSelectedLoan(loan)}>
+                        <EyeIcon />
+                        Ver
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => {
                           setEditError(null)
@@ -241,6 +256,18 @@ export function LoansTable({
             error={editError}
             onSubmit={handleEdit}
           />
+        )}
+      </Dialog>
+
+      {/* Detail Dialog */}
+      <Dialog
+        open={selectedLoan !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedLoan(null)
+        }}
+      >
+        {selectedLoan && (
+          <LoanDetail loan={selectedLoan} onPaymentChange={onPaymentChange} />
         )}
       </Dialog>
 

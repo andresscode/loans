@@ -57,6 +57,12 @@ export type UpdateLoanInput = {
   dueDate: string
 }
 
+export type CreatePaymentInput = {
+  loanId: number
+  amount: number
+  paymentDate: string
+}
+
 export type PaginatedResult<T> = {
   data: T[]
   total: number
@@ -75,6 +81,9 @@ export type LoansApi = {
     pageSize: number
   }) => Promise<PaginatedResult<LoanWithBorrower>>
   searchBorrowers: (query: string) => Promise<Borrower[]>
+  getPayments: (loanId: number) => Promise<Payment[]>
+  createPayment: (data: CreatePaymentInput) => Promise<ActionResult<Payment>>
+  deletePayment: (id: number) => Promise<ActionResult>
 }
 
 export type AuthApi = {

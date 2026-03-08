@@ -12,6 +12,11 @@ import {
   getAllLoansWithBorrowers,
   updateLoan,
 } from './database/loans'
+import {
+  createPayment,
+  deletePayment,
+  getPaymentsByLoanId,
+} from './database/payments'
 import { createSession, validateSession } from './database/sessions'
 import { authenticateUser, createUser, getUserCount } from './database/users'
 
@@ -250,6 +255,52 @@ function registerIpcHandlers() {
       return { success: true }
     } catch {
       return { success: false, error: 'Error al eliminar el préstamo' }
+    }
+  })
+
+  ipcMain.handle('loans:get-payments', (_event, loanId: number) => {
+    const rows = getPaymentsByLoanId(loanId)
+    return rows.map((row) => ({
+      id: row.id,
+      loanId: row.loan_id,
+      amount: row.amount,
+      paymentDate: row.payment_date,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }))
+  })
+
+  ipcMain.handle(
+    'loans:create-payment',
+    (_event, data: { loanId: number; amount: number; paymentDate: string }) => {
+      try {
+        const row = createPayment(data)
+        return {
+          success: true,
+          data: {
+            id: row.id,
+            loanId: row.loan_id,
+            amount: row.amount,
+            paymentDate: row.payment_date,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          },
+        }
+      } catch {
+        return { success: false, error: 'Error al crear el pago' }
+      }
+    },
+  )
+
+  ipcMain.handle('loans:delete-payment', (_event, id: number) => {
+    try {
+      const deleted = deletePayment(id)
+      if (!deleted) {
+        return { success: false, error: 'El pago no existe' }
+      }
+      return { success: true }
+    } catch {
+      return { success: false, error: 'Error al eliminar el pago' }
     }
   })
 }
