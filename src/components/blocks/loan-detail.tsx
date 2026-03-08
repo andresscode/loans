@@ -41,7 +41,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatCOP } from '@/lib/loan-math'
-import { cn } from '@/lib/utils'
+import { cn, parseLocalDate } from '@/lib/utils'
 import { loansService } from '@/services/loans'
 import type { LoanWithBorrower, Payment } from '@/types'
 
@@ -65,7 +65,7 @@ function formatDate(dateStr: string): string {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
-  }).format(new Date(dateStr))
+  }).format(parseLocalDate(dateStr))
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-CO', {
@@ -97,7 +97,7 @@ export function LoanDetail({ loan, onPaymentChange }: LoanDetailProps) {
   const [refreshToken, refresh] = useReducer((x: number) => x + 1, 0)
   const [showForm, setShowForm] = useState(false)
   const [amountRaw, setAmountRaw] = useState<number | null>(null)
-  const [paymentDate, setPaymentDate] = useState<Date | undefined>(undefined)
+  const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date())
   const [errors, setErrors] = useState<PaymentFieldErrors>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [deletingPayment, setDeletingPayment] = useState<Payment | null>(null)
@@ -145,7 +145,7 @@ export function LoanDetail({ loan, onPaymentChange }: LoanDetailProps) {
 
     if (createResult.success) {
       setAmountRaw(null)
-      setPaymentDate(undefined)
+      setPaymentDate(new Date())
       setShowForm(false)
       refresh()
       onPaymentChange?.()

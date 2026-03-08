@@ -36,6 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { parseLocalDate } from '@/lib/utils'
 import type { LoanWithBorrower, UpdateLoanInput } from '@/types'
 
 const frequencyLabels: Record<string, string> = {
@@ -58,7 +59,7 @@ function formatDate(dateStr: string): string {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
-  }).format(new Date(dateStr))
+  }).format(parseLocalDate(dateStr))
 }
 
 type LoansTableProps = {

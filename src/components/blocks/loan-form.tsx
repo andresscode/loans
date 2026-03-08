@@ -36,7 +36,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatCOP } from '@/lib/loan-math'
-import { cn } from '@/lib/utils'
+import { cn, parseLocalDate } from '@/lib/utils'
 import type { CreateLoanInput, PaymentFrequency } from '@/types'
 
 const dateFormatter = new Intl.DateTimeFormat('es-CO', {
@@ -78,7 +78,7 @@ const loanFormSchema = z
   .refine(
     (data) => {
       if (data.startDate && data.dueDate) {
-        return new Date(data.dueDate) > new Date(data.startDate)
+        return parseLocalDate(data.dueDate) > parseLocalDate(data.startDate)
       }
       return true
     },

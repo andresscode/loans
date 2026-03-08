@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatCOP } from '@/lib/loan-math'
-import { cn } from '@/lib/utils'
+import { cn, parseLocalDate } from '@/lib/utils'
 import type {
   LoanWithBorrower,
   PaymentFrequency,
@@ -70,7 +70,7 @@ const editLoanSchema = z
   .refine(
     (data) => {
       if (data.startDate && data.dueDate) {
-        return new Date(data.dueDate) > new Date(data.startDate)
+        return parseLocalDate(data.dueDate) > parseLocalDate(data.startDate)
       }
       return true
     },
@@ -109,10 +109,10 @@ export function EditLoanForm({
     loan.paymentFrequency,
   )
   const [startDate, setStartDate] = useState<Date | undefined>(
-    new Date(`${loan.startDate}T00:00:00`),
+    parseLocalDate(loan.startDate),
   )
   const [dueDate, setDueDate] = useState<Date | undefined>(
-    new Date(`${loan.dueDate}T00:00:00`),
+    parseLocalDate(loan.dueDate),
   )
   const [errors, setErrors] = useState<FieldErrors>({})
 
