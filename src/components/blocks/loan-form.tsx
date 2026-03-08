@@ -6,6 +6,7 @@ import {
   BorrowerCombobox,
   type BorrowerSelection,
 } from '@/components/blocks/borrower-combobox'
+import { LoanCalculator } from '@/components/blocks/loan-calculator'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import {
@@ -34,18 +35,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { formatCOP } from '@/lib/loan-calculations'
 import { cn } from '@/lib/utils'
 import type { CreateLoanInput, PaymentFrequency } from '@/types'
-
-const copFormatter = new Intl.NumberFormat('es-CO', {
-  style: 'decimal',
-  maximumFractionDigits: 0,
-})
-
-function formatCOP(value: number | null): string {
-  if (value === null || value === 0) return ''
-  return copFormatter.format(value)
-}
 
 const dateFormatter = new Intl.DateTimeFormat('es-CO', {
   day: '2-digit',
@@ -118,20 +110,21 @@ type LoanFormProps = {
 export function LoanForm({ isSubmitting, error, onSubmit }: LoanFormProps) {
   const [borrower, setBorrower] = useState<BorrowerSelection | null>(null)
   const [amountRaw, setAmountRaw] = useState<number | null>(null)
-  const [paymentFrequency, setPaymentFrequency] = useState<string>('')
-  const [startDate, setStartDate] = useState<Date | undefined>(undefined)
-  const [dueDate, setDueDate] = useState<Date | undefined>(undefined)
+  const [interestRateRaw, setInterestRateRaw] = useState('')
+  const [paymentFrequency, setPaymentFrequency] = useState<string>('weekly')
+  const [startDate, setStartDate] = useState<Date | undefined>(() => new Date())
+  const [dueDate, setDueDate] = useState<Date | undefined>(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth() + 1, d.getDate())
+  })
   const [errors, setErrors] = useState<FieldErrors>({})
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const form = e.currentTarget
     const formData = {
       borrower,
       amount: amountRaw !== null ? String(amountRaw) : '',
-      interestRate: (
-        form.elements.namedItem('interestRate') as HTMLInputElement
-      ).value,
+      interestRate: interestRateRaw,
       paymentFrequency: paymentFrequency || undefined,
       startDate: startDate ? startDate.toISOString().split('T')[0] : '',
       dueDate: dueDate ? dueDate.toISOString().split('T')[0] : '',
@@ -213,6 +206,8 @@ export function LoanForm({ isSubmitting, error, onSubmit }: LoanFormProps) {
                 min="0"
                 step="0.01"
                 placeholder="0.00"
+                value={interestRateRaw}
+                onChange={(e) => setInterestRateRaw(e.target.value)}
               />
               {errors.interestRate && (
                 <FieldError>{errors.interestRate}</FieldError>
@@ -299,6 +294,14 @@ export function LoanForm({ isSubmitting, error, onSubmit }: LoanFormProps) {
             </Field>
           </div>
         </FieldGroup>
+
+        <LoanCalculator
+          amount={amountRaw}
+          interestRate={interestRateRaw}
+          paymentFrequency={paymentFrequency}
+          startDate={startDate}
+          dueDate={dueDate}
+        />
 
         {error && (
           <div

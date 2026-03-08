@@ -2,6 +2,7 @@ import { CalendarIcon, Loader2Icon } from 'lucide-react'
 import { useState } from 'react'
 import { es } from 'react-day-picker/locale'
 import { z } from 'zod/v4'
+import { LoanCalculator } from '@/components/blocks/loan-calculator'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import {
@@ -30,22 +31,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { formatCOP } from '@/lib/loan-calculations'
 import { cn } from '@/lib/utils'
 import type {
   LoanWithBorrower,
   PaymentFrequency,
   UpdateLoanInput,
 } from '@/types'
-
-const copFormatter = new Intl.NumberFormat('es-CO', {
-  style: 'decimal',
-  maximumFractionDigits: 0,
-})
-
-function formatCOP(value: number | null): string {
-  if (value === null || value === 0) return ''
-  return copFormatter.format(value)
-}
 
 const dateFormatter = new Intl.DateTimeFormat('es-CO', {
   day: '2-digit',
@@ -110,6 +102,9 @@ export function EditLoanForm({
   onSubmit,
 }: EditLoanFormProps) {
   const [amountRaw, setAmountRaw] = useState<number | null>(loan.amount)
+  const [interestRateRaw, setInterestRateRaw] = useState(
+    String(loan.interestRate),
+  )
   const [paymentFrequency, setPaymentFrequency] = useState<string>(
     loan.paymentFrequency,
   )
@@ -123,12 +118,9 @@ export function EditLoanForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const form = e.currentTarget
     const formData = {
       amount: amountRaw !== null ? String(amountRaw) : '',
-      interestRate: (
-        form.elements.namedItem('interestRate') as HTMLInputElement
-      ).value,
+      interestRate: interestRateRaw,
       paymentFrequency: paymentFrequency || undefined,
       startDate: startDate ? startDate.toISOString().split('T')[0] : '',
       dueDate: dueDate ? dueDate.toISOString().split('T')[0] : '',
@@ -195,7 +187,8 @@ export function EditLoanForm({
                 min="0"
                 step="0.01"
                 placeholder="0.00"
-                defaultValue={loan.interestRate}
+                value={interestRateRaw}
+                onChange={(e) => setInterestRateRaw(e.target.value)}
               />
               {errors.interestRate && (
                 <FieldError>{errors.interestRate}</FieldError>
@@ -282,6 +275,14 @@ export function EditLoanForm({
             </Field>
           </div>
         </FieldGroup>
+
+        <LoanCalculator
+          amount={amountRaw}
+          interestRate={interestRateRaw}
+          paymentFrequency={paymentFrequency}
+          startDate={startDate}
+          dueDate={dueDate}
+        />
 
         {error && (
           <div

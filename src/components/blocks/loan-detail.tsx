@@ -40,6 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { formatCOP } from '@/lib/loan-calculations'
 import { cn } from '@/lib/utils'
 import { loansService } from '@/services/loans'
 import type { LoanWithBorrower, Payment } from '@/types'
@@ -65,16 +66,6 @@ function formatDate(dateStr: string): string {
     month: 'short',
     year: 'numeric',
   }).format(new Date(dateStr))
-}
-
-const copFormatter = new Intl.NumberFormat('es-CO', {
-  style: 'decimal',
-  maximumFractionDigits: 0,
-})
-
-function formatCOP(value: number | null): string {
-  if (value === null || value === 0) return ''
-  return copFormatter.format(value)
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-CO', {
