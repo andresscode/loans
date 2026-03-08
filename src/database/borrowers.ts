@@ -43,6 +43,12 @@ export function updateBorrower(
   return getBorrowerById(id)
 }
 
+export function searchBorrowersByName(query: string): BorrowerRow[] {
+  return getDb()
+    .prepare('SELECT * FROM borrowers WHERE name LIKE ? ORDER BY name')
+    .all(`%${query}%`) as BorrowerRow[]
+}
+
 export function deleteBorrower(id: number): boolean {
   const result = getDb().prepare('DELETE FROM borrowers WHERE id = ?').run(id)
   return result.changes > 0

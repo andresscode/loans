@@ -40,6 +40,20 @@ export type Payment = {
   updatedAt: string
 }
 
+export type CreateLoanInput = {
+  borrower: { type: 'existing'; id: number } | { type: 'new'; name: string }
+  amount: number
+  interestRate: number
+  paymentFrequency: PaymentFrequency
+  startDate: string
+  dueDate: string
+}
+
+export type LoansApi = {
+  create: (data: CreateLoanInput) => Promise<ActionResult<Loan>>
+  searchBorrowers: (query: string) => Promise<Borrower[]>
+}
+
 export type AuthApi = {
   hasUsers: () => Promise<boolean>
   setup: (data: {
@@ -56,6 +70,6 @@ export type AuthApi = {
 
 declare global {
   interface Window {
-    api: { auth: AuthApi }
+    api: { auth: AuthApi; loans: LoansApi }
   }
 }

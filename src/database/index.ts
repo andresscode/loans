@@ -59,6 +59,8 @@ export function initDatabase(): void {
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (loan_id) REFERENCES loans(id) ON DELETE CASCADE
     );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_borrowers_name ON borrowers(name);
   `)
 }
 

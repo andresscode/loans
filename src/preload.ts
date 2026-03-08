@@ -13,4 +13,16 @@ contextBridge.exposeInMainWorld('api', {
     validateSession: (data: { token: string }) =>
       ipcRenderer.invoke('auth:validate-session', data),
   },
+  loans: {
+    create: (data: {
+      borrower: { type: 'existing'; id: number } | { type: 'new'; name: string }
+      amount: number
+      interestRate: number
+      paymentFrequency: string
+      startDate: string
+      dueDate: string
+    }) => ipcRenderer.invoke('loans:create', data),
+    searchBorrowers: (query: string) =>
+      ipcRenderer.invoke('loans:search-borrowers', query),
+  },
 })
