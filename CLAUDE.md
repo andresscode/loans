@@ -32,6 +32,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `src/main.ts` — Creates BrowserWindow, loads Vite dev server or built files
 - `src/preload.ts` — Exposes version info via `contextBridge`
 
+## Database
+
+- **SQLite** via `better-sqlite3` (synchronous), stored at `app.getPath('userData')/mis-prestamos.db`
+- Schema defined inline in `src/database/index.ts` using `CREATE TABLE IF NOT EXISTS`
+- Pragmas: WAL mode, foreign keys ON
+- Query pattern: `getDb().prepare(sql).run/get/all()` with parameterized queries
+- Each domain gets its own file in `src/database/` (e.g., `users.ts`, `borrowers.ts`, `loans.ts`, `payments.ts`)
+- No ORM, no migrations — schema created on app startup
+
 ## Key Conventions
 
 - **Path alias:** `@/` maps to `src/` (configured in both tsconfig.json and vite.config.ts)
