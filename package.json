@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsc -p tsconfig.node.json && concurrently \"vite\" \"wait-on tcp:5173 && electron .\"",
     "build": "tsc -p tsconfig.node.json && tsc && vite build",
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && biome check --write --unsafe",
     "postinstall": "electron-rebuild"
   },
   "dependencies": {
@@ -28,6 +28,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.6",
     "@electron/rebuild": "^4.0.3",
     "@types/bcryptjs": "^3.0.0",
     "@types/better-sqlite3": "^7.6.13",

@@ -1,24 +1,24 @@
-import "./global.css";
-import { HashRouter, Routes, Route, Navigate } from "react-router";
-import { AuthProvider, useAuth } from "@/contexts/auth-context";
-import { LoginPage } from "@/pages/login";
-import { HomePage } from "@/pages/home";
+import './global.css'
+import { HashRouter, Navigate, Route, Routes } from 'react-router'
+import { AuthProvider, useAuth } from '@/contexts/auth-context'
+import { HomePage } from '@/pages/home'
+import { LoginPage } from '@/pages/login'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading } = useAuth()
 
   if (isLoading) {
     return (
       <div className="flex min-h-svh items-center justify-center">
         <p className="text-muted-foreground">Cargando...</p>
       </div>
-    );
+    )
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace />
   }
-  return children;
+  return children
 }
 
 export default function App() {
@@ -38,5 +38,5 @@ export default function App() {
         </Routes>
       </AuthProvider>
     </HashRouter>
-  );
+  )
 }
