@@ -1,12 +1,33 @@
 import "./global.css";
-import { LoginForm } from "@/components/blocks/login-form";
+import { HashRouter, Routes, Route, Navigate } from "react-router";
+import { AuthProvider, useAuth } from "@/contexts/auth-context";
+import { LoginPage } from "@/pages/login";
+import { HomePage } from "@/pages/home";
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+}
 
 export default function App() {
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-sm">
-        <LoginForm />
-      </div>
-    </div>
+    <HashRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <HomePage />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </AuthProvider>
+    </HashRouter>
   );
 }

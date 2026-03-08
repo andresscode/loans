@@ -10,10 +10,21 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-export function LoginForm({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
+type LoginFormProps = React.ComponentProps<"div"> & {
+  onLogin?: (username: string, password: string) => void;
+};
+
+export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
+  function handleSubmit(e: React.SyntheticEvent<HTMLFormElement, SubmitEvent>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const username = (form.elements.namedItem("username") as HTMLInputElement)
+      .value;
+    const password = (form.elements.namedItem("password") as HTMLInputElement)
+      .value;
+    onLogin?.(username, password);
+  }
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -24,7 +35,7 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form>
+          <form onSubmit={handleSubmit}>
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="username">Usuario</FieldLabel>
