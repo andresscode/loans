@@ -9,6 +9,36 @@ export type User = {
   createdAt: string
 }
 
+export type PaymentFrequency = 'weekly' | 'biweekly' | 'monthly'
+
+export type Borrower = {
+  id: number
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type Loan = {
+  id: number
+  borrowerId: number
+  amount: number
+  interestRate: number
+  paymentFrequency: PaymentFrequency
+  startDate: string
+  dueDate: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type Payment = {
+  id: number
+  loanId: number
+  amount: number
+  paymentDate: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type AuthApi = {
   hasUsers: () => Promise<boolean>
   setup: (data: {
