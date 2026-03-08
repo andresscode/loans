@@ -1,6 +1,6 @@
 {
-  "name": "tata",
-  "version": "0.0.1",
+  "name": "mis-prestamos",
+  "version": "0.1.0",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {

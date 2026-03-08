@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Tata** ("Mis Prestamos") is a loan management desktop app built with Electron + React + Vite. UI text is in Spanish.
+**Mis Prestamos** is a loan management desktop app built with Electron + React + Vite. UI text is in Spanish.
 
 ## Commands
 
