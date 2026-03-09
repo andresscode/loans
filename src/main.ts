@@ -18,6 +18,7 @@ import {
   deletePayment,
   getPaymentsByLoanId,
 } from './database/payments'
+import { seedDatabase } from './database/seed'
 import { createSession, validateSession } from './database/sessions'
 import { authenticateUser, createUser, getUserCount } from './database/users'
 import { analyzeLoan } from './lib/loan-math'
@@ -463,6 +464,10 @@ function createWindow() {
 
 app.whenReady().then(() => {
   initDatabase()
+  // DEV ONLY: seed test data — remove when no longer testing
+  if (!app.isPackaged) {
+    seedDatabase()
+  }
   registerIpcHandlers()
   createWindow()
 })
