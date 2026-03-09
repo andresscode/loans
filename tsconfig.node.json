@@ -9,5 +9,12 @@
     "forceConsistentCasingInFileNames": true,
     "outDir": "dist-electron"
   },
-  "include": ["src/main.ts", "src/preload.ts", "src/database/**/*.ts"]
+  "include": [
+    "src/main.ts",
+    "src/preload.ts",
+    "src/database/**/*.ts",
+    "src/lib/**/*.ts",
+    "src/types/**/*.ts"
+  ],
+  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts"]
 }

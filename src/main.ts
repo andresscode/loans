@@ -10,6 +10,7 @@ import {
   createLoan,
   deleteLoan,
   getAllLoansWithBorrowers,
+  getAllLoansWithPaymentSummary,
   updateLoan,
 } from './database/loans'
 import {
@@ -19,6 +20,16 @@ import {
 } from './database/payments'
 import { createSession, validateSession } from './database/sessions'
 import { authenticateUser, createUser, getUserCount } from './database/users'
+import { analyzeLoan } from './lib/loan-math'
+import type {
+  ActiveLoanRow,
+  DueLoanRow,
+  OverdueLoanRow,
+  PaidLoanRow,
+  PaymentFrequency,
+  SortingParam,
+  TabQueryParams,
+} from './types'
 
 function toUser(row: {
   id: number
@@ -32,6 +43,10 @@ function toUser(row: {
     displayName: row.display_name,
     createdAt: row.created_at,
   }
+}
+
+function parseLocalDate(dateStr: string): Date {
+  return new Date(`${dateStr}T00:00:00`)
 }
 
 function registerIpcHandlers() {
@@ -302,6 +317,131 @@ function registerIpcHandlers() {
     } catch {
       return { success: false, error: 'Error al eliminar el pago' }
     }
+  })
+
+  // Helper to sort and paginate
+  function sortBy<T>(arr: T[], column: string, direction: 'asc' | 'desc'): T[] {
+    return [...arr].sort((a, b) => {
+      const aVal = (a as Record<string, unknown>)[column]
+      const bVal = (b as Record<string, unknown>)[column]
+      if (aVal == null && bVal == null) return 0
+      if (aVal == null) return 1
+      if (bVal == null) return -1
+      if (aVal < bVal) return direction === 'asc' ? -1 : 1
+      if (aVal > bVal) return direction === 'asc' ? 1 : -1
+      return 0
+    })
+  }
+
+  function paginate<T>(
+    arr: T[],
+    params: TabQueryParams,
+    defaultSort: { column: string; direction: 'asc' | 'desc' },
+  ) {
+    const sorting: SortingParam = params.sorting ?? defaultSort
+    const sorted = sortBy(arr, sorting.column, sorting.direction)
+    const start = (params.page - 1) * params.pageSize
+    return {
+      data: sorted.slice(start, start + params.pageSize),
+      total: arr.length,
+      page: params.page,
+      pageSize: params.pageSize,
+    }
+  }
+
+  function analyzeAllLoans() {
+    const rows = getAllLoansWithPaymentSummary()
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    return rows
+      .map((row) => {
+        const analysis = analyzeLoan({
+          amount: row.amount,
+          interestRate: row.interest_rate,
+          paymentFrequency: row.payment_frequency as PaymentFrequency,
+          startDate: parseLocalDate(row.start_date),
+          dueDate: parseLocalDate(row.due_date),
+          totalPaid: row.total_paid,
+          today,
+        })
+        return analysis ? { row, analysis } : null
+      })
+      .filter((x) => x !== null)
+  }
+
+  ipcMain.handle('loans:get-active', (_event, params: TabQueryParams) => {
+    const all = analyzeAllLoans()
+    const active: ActiveLoanRow[] = all
+      .filter(({ analysis }) => !analysis.isFullyPaid)
+      .map(({ row, analysis }) => ({
+        id: row.id,
+        borrowerId: row.borrower_id,
+        amount: row.amount,
+        interestRate: row.interest_rate,
+        paymentFrequency: row.payment_frequency as PaymentFrequency,
+        startDate: row.start_date,
+        dueDate: row.due_date,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        borrowerName: row.borrower_name,
+        totalToRepay: analysis.totalToRepay,
+        totalPaid: analysis.totalPaid,
+        progress: analysis.progress,
+      }))
+    return paginate(active, params, { column: 'createdAt', direction: 'desc' })
+  })
+
+  ipcMain.handle('loans:get-due', (_event, params: TabQueryParams) => {
+    const all = analyzeAllLoans()
+    const due: DueLoanRow[] = all
+      .filter(({ analysis }) => analysis.isDueThisWeek && !analysis.isFullyPaid)
+      .map(({ row, analysis }) => ({
+        id: row.id,
+        borrowerName: row.borrower_name,
+        currentPaymentAmount: analysis.currentPaymentAmount,
+        overduePaymentsTotal: analysis.overdueTotal,
+        totalDue: analysis.currentPaymentAmount + analysis.overdueTotal,
+        paymentFrequency: row.payment_frequency as PaymentFrequency,
+        amount: row.amount,
+      }))
+    return paginate(due, params, { column: 'totalDue', direction: 'desc' })
+  })
+
+  ipcMain.handle('loans:get-overdue', (_event, params: TabQueryParams) => {
+    const all = analyzeAllLoans()
+    const overdue: OverdueLoanRow[] = all
+      .filter(
+        ({ analysis }) => analysis.overdueCount > 0 && !analysis.isFullyPaid,
+      )
+      .map(({ row, analysis }) => ({
+        id: row.id,
+        borrowerName: row.borrower_name,
+        overdueCount: analysis.overdueCount,
+        overdueTotal: analysis.overdueTotal,
+        lastPaymentDate: row.last_payment_date,
+        amount: row.amount,
+      }))
+    return paginate(overdue, params, {
+      column: 'overdueTotal',
+      direction: 'desc',
+    })
+  })
+
+  ipcMain.handle('loans:get-paid', (_event, params: TabQueryParams) => {
+    const all = analyzeAllLoans()
+    const paid: PaidLoanRow[] = all
+      .filter(({ analysis }) => analysis.isFullyPaid)
+      .map(({ row, analysis }) => ({
+        id: row.id,
+        borrowerName: row.borrower_name,
+        amount: row.amount,
+        totalInterest: analysis.totalToRepay - row.amount,
+        totalPaid: analysis.totalPaid,
+        startDate: row.start_date,
+        closedDate: row.last_payment_date ?? row.due_date,
+      }))
+    return paginate(paid, params, { column: 'closedDate', direction: 'desc' })
   })
 }
 

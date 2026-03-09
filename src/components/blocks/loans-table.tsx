@@ -1,12 +1,12 @@
+import type { ColumnDef, SortingState, Updater } from '@tanstack/react-table'
 import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
   EllipsisVerticalIcon,
   EyeIcon,
   PencilIcon,
   TrashIcon,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useEffect, useReducer, useState } from 'react'
+import { DataTable } from '@/components/blocks/data-table'
 import { EditLoanForm } from '@/components/blocks/edit-loan-form'
 import { LoanDetail } from '@/components/blocks/loan-detail'
 import {
@@ -28,16 +28,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { parseLocalDate } from '@/lib/utils'
-import type { LoanWithBorrower, UpdateLoanInput } from '@/types'
+import { loansService } from '@/services/loans'
+import type {
+  ActiveLoanRow,
+  DueLoanRow,
+  LoanWithBorrower,
+  OverdueLoanRow,
+  PaidLoanRow,
+  SortingParam,
+  UpdateLoanInput,
+} from '@/types'
 
 const frequencyLabels: Record<string, string> = {
   weekly: 'Semanal',
@@ -62,40 +64,406 @@ function formatDate(dateStr: string): string {
   }).format(parseLocalDate(dateStr))
 }
 
-type LoansTableProps = {
-  loans: LoanWithBorrower[]
+function toSortingParam(sorting: SortingState): SortingParam {
+  if (sorting.length === 0) return null
+  return { column: sorting[0].id, direction: sorting[0].desc ? 'desc' : 'asc' }
+}
+
+// --- Column definitions ---
+
+const activeColumns: ColumnDef<ActiveLoanRow, unknown>[] = [
+  { accessorKey: 'borrowerName', header: 'Prestatario', enableSorting: true },
+  {
+    accessorKey: 'amount',
+    header: 'Monto',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="tabular-nums">
+        {formatCurrency(row.original.amount)}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'interestRate',
+    header: 'Tasa',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="tabular-nums">{row.original.interestRate}%</span>
+    ),
+  },
+  {
+    accessorKey: 'paymentFrequency',
+    header: 'Frecuencia',
+    enableSorting: false,
+    cell: ({ row }) =>
+      frequencyLabels[row.original.paymentFrequency] ??
+      row.original.paymentFrequency,
+  },
+  {
+    accessorKey: 'startDate',
+    header: 'Fecha de inicio',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="tabular-nums">{formatDate(row.original.startDate)}</span>
+    ),
+  },
+  {
+    accessorKey: 'dueDate',
+    header: 'Fecha de vencimiento',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="tabular-nums">{formatDate(row.original.dueDate)}</span>
+    ),
+  },
+  {
+    accessorKey: 'progress',
+    header: 'Progreso',
+    enableSorting: true,
+    cell: ({ row }) => {
+      const { totalPaid, totalToRepay, progress } = row.original
+      return (
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 w-16 rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <span className="text-muted-foreground text-xs tabular-nums">
+            {formatCurrency(totalPaid)} / {formatCurrency(totalToRepay)}
+          </span>
+        </div>
+      )
+    },
+  },
+]
+
+const dueColumns: ColumnDef<DueLoanRow, unknown>[] = [
+  { accessorKey: 'borrowerName', header: 'Prestatario', enableSorting: true },
+  {
+    accessorKey: 'currentPaymentAmount',
+    header: 'Cuota actual',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="tabular-nums">
+        {formatCurrency(row.original.currentPaymentAmount)}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'overduePaymentsTotal',
+    header: 'Cuotas vencidas',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="tabular-nums">
+        {formatCurrency(row.original.overduePaymentsTotal)}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'totalDue',
+    header: 'Total a cobrar',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="font-medium tabular-nums">
+        {formatCurrency(row.original.totalDue)}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'paymentFrequency',
+    header: 'Frecuencia',
+    enableSorting: false,
+    cell: ({ row }) =>
+      frequencyLabels[row.original.paymentFrequency] ??
+      row.original.paymentFrequency,
+  },
+  {
+    accessorKey: 'amount',
+    header: 'Monto del prestamo',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="tabular-nums">
+        {formatCurrency(row.original.amount)}
+      </span>
+    ),
+  },
+]
+
+const overdueColumns: ColumnDef<OverdueLoanRow, unknown>[] = [
+  { accessorKey: 'borrowerName', header: 'Prestatario', enableSorting: true },
+  {
+    accessorKey: 'overdueCount',
+    header: 'Cuotas vencidas',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="font-medium text-destructive tabular-nums">
+        {row.original.overdueCount}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'overdueTotal',
+    header: 'Total vencido',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="font-medium text-destructive tabular-nums">
+        {formatCurrency(row.original.overdueTotal)}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'lastPaymentDate',
+    header: 'Ultima fecha de pago',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="tabular-nums">
+        {row.original.lastPaymentDate
+          ? formatDate(row.original.lastPaymentDate)
+          : '—'}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'amount',
+    header: 'Monto del prestamo',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="tabular-nums">
+        {formatCurrency(row.original.amount)}
+      </span>
+    ),
+  },
+]
+
+const paidColumns: ColumnDef<PaidLoanRow, unknown>[] = [
+  { accessorKey: 'borrowerName', header: 'Prestatario', enableSorting: true },
+  {
+    accessorKey: 'amount',
+    header: 'Capital',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="tabular-nums">
+        {formatCurrency(row.original.amount)}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'totalInterest',
+    header: 'Interes ganado',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="tabular-nums">
+        {formatCurrency(row.original.totalInterest)}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'totalPaid',
+    header: 'Total pagado',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="font-medium tabular-nums">
+        {formatCurrency(row.original.totalPaid)}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'startDate',
+    header: 'Fecha de inicio',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="tabular-nums">{formatDate(row.original.startDate)}</span>
+    ),
+  },
+  {
+    accessorKey: 'closedDate',
+    header: 'Fecha de cierre',
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="tabular-nums">
+        {formatDate(row.original.closedDate)}
+      </span>
+    ),
+  },
+]
+
+// --- Actions column factory ---
+
+function makeActionsColumn<T extends { id: number }>(options: {
+  onView: (row: T) => void
+  onEdit?: (row: T) => void
+  onDelete?: (row: T) => void
+}): ColumnDef<T, unknown> {
+  return {
+    id: 'actions',
+    enableHiding: false,
+    enableSorting: false,
+    cell: ({ row }) => (
+      <div
+        role="toolbar"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-sm">
+              <EllipsisVerticalIcon />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => options.onView(row.original)}>
+              <EyeIcon />
+              Ver
+            </DropdownMenuItem>
+            {options.onEdit && (
+              <DropdownMenuItem onSelect={() => options.onEdit?.(row.original)}>
+                <PencilIcon />
+                Editar
+              </DropdownMenuItem>
+            )}
+            {options.onDelete && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => options.onDelete?.(row.original)}
+                >
+                  <TrashIcon />
+                  Eliminar
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    ),
+  }
+}
+
+// --- Tab state hook ---
+
+type TabState<T> = {
+  data: T[]
   total: number
   page: number
   pageSize: number
-  onPageChange: (page: number) => void
+  sorting: SortingState
+}
+
+function useTabData<T>(
+  fetcher: (params: {
+    page: number
+    pageSize: number
+    sorting: SortingParam
+  }) => Promise<{ data: T[]; total: number; page: number; pageSize: number }>,
+  refreshToken: number,
+) {
+  const [state, setState] = useState<TabState<T>>({
+    data: [],
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    sorting: [],
+  })
+  const [, forceRefresh] = useReducer((x: number) => x + 1, 0)
+
+  const fetchData = useCallback(async () => {
+    const result = await fetcher({
+      page: state.page,
+      pageSize: state.pageSize,
+      sorting: toSortingParam(state.sorting),
+    })
+    setState((prev) => ({
+      ...prev,
+      data: result.data,
+      total: result.total,
+    }))
+  }, [fetcher, state.page, state.pageSize, state.sorting])
+
+  useEffect(() => {
+    void refreshToken
+    void forceRefresh
+    fetchData()
+  }, [fetchData, refreshToken])
+
+  return {
+    ...state,
+    setPage: (page: number) => setState((prev) => ({ ...prev, page })),
+    setPageSize: (pageSize: number) =>
+      setState((prev) => ({ ...prev, pageSize, page: 1 })),
+    setSorting: (updater: Updater<SortingState>) =>
+      setState((prev) => ({
+        ...prev,
+        sorting:
+          typeof updater === 'function' ? updater(prev.sorting) : updater,
+      })),
+    refresh: forceRefresh,
+  }
+}
+
+// --- Main component ---
+
+type LoansTableProps = {
   onEdit: (id: number, data: UpdateLoanInput) => Promise<boolean>
   onDelete: (id: number) => Promise<boolean>
   onPaymentChange?: () => void
+  refreshToken: number
 }
 
 export function LoansTable({
-  loans,
-  total,
-  page,
-  pageSize,
-  onPageChange,
   onEdit,
   onDelete,
   onPaymentChange,
+  refreshToken,
 }: LoansTableProps) {
-  const totalPages = Math.ceil(total / pageSize)
-  const from = total === 0 ? 0 : (page - 1) * pageSize + 1
-  const to = Math.min(page * pageSize, total)
-
+  const [selectedLoanId, setSelectedLoanId] = useState<number | null>(null)
   const [selectedLoan, setSelectedLoan] = useState<LoanWithBorrower | null>(
     null,
   )
-  const [editingLoan, setEditingLoan] = useState<LoanWithBorrower | null>(null)
-  const [deletingLoan, setDeletingLoan] = useState<LoanWithBorrower | null>(
-    null,
-  )
+  const [editingLoan, setEditingLoan] = useState<ActiveLoanRow | null>(null)
+  const [deletingLoan, setDeletingLoan] = useState<ActiveLoanRow | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+
+  const active = useTabData<ActiveLoanRow>(loansService.getActive, refreshToken)
+  const due = useTabData<DueLoanRow>(loansService.getDue, refreshToken)
+  const overdue = useTabData<OverdueLoanRow>(
+    loansService.getOverdue,
+    refreshToken,
+  )
+  const paid = useTabData<PaidLoanRow>(loansService.getPaid, refreshToken)
+
+  // When a row is clicked, build a LoanWithBorrower for the detail dialog
+  function handleViewActive(row: ActiveLoanRow) {
+    setSelectedLoan({
+      id: row.id,
+      borrowerId: row.borrowerId,
+      amount: row.amount,
+      interestRate: row.interestRate,
+      paymentFrequency: row.paymentFrequency,
+      startDate: row.startDate,
+      dueDate: row.dueDate,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      borrowerName: row.borrowerName,
+    })
+  }
+
+  function handleViewById(id: number, _borrowerName: string) {
+    // For non-active tabs, we just set the ID to open the detail
+    setSelectedLoanId(id)
+    // We need to fetch the full loan data; for now use getAll as fallback
+    // The LoanDetail component fetches payments itself, so we build a minimal object
+    setSelectedLoan(null)
+    // Fetch the loan details
+    loansService.getAll(1, 1000).then((result) => {
+      const loan = result.data.find((l) => l.id === id)
+      if (loan) {
+        setSelectedLoan(loan)
+      }
+    })
+  }
 
   async function handleEdit(data: UpdateLoanInput) {
     if (!editingLoan) return
@@ -126,121 +494,142 @@ export function LoansTable({
     }
   }
 
-  if (total === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
-        <p className="text-muted-foreground text-sm">
-          No hay prestamos registrados
-        </p>
-        <p className="mt-1 text-muted-foreground/60 text-xs">
-          Crea tu primer prestamo para comenzar
-        </p>
-      </div>
-    )
-  }
+  const handlePaymentChange = useCallback(() => {
+    onPaymentChange?.()
+  }, [onPaymentChange])
+
+  // Build columns with actions
+  const activeColumnsWithActions = [
+    ...activeColumns,
+    makeActionsColumn<ActiveLoanRow>({
+      onView: handleViewActive,
+      onEdit: (row) => {
+        setEditError(null)
+        setEditingLoan(row)
+      },
+      onDelete: (row) => setDeletingLoan(row),
+    }),
+  ]
+
+  const dueColumnsWithActions = [
+    ...dueColumns,
+    makeActionsColumn<DueLoanRow>({
+      onView: (row) => handleViewById(row.id, row.borrowerName),
+    }),
+  ]
+
+  const overdueColumnsWithActions = [
+    ...overdueColumns,
+    makeActionsColumn<OverdueLoanRow>({
+      onView: (row) => handleViewById(row.id, row.borrowerName),
+    }),
+  ]
+
+  const paidColumnsWithActions = [
+    ...paidColumns,
+    makeActionsColumn<PaidLoanRow>({
+      onView: (row) => handleViewById(row.id, row.borrowerName),
+    }),
+  ]
 
   return (
-    <div className="space-y-3">
-      <div className="rounded-xl border">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead>Prestatario</TableHead>
-              <TableHead className="text-right">Monto</TableHead>
-              <TableHead className="text-right">Tasa de interes</TableHead>
-              <TableHead>Frecuencia</TableHead>
-              <TableHead>Fecha de inicio</TableHead>
-              <TableHead>Fecha de vencimiento</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loans.map((loan) => (
-              <TableRow
-                key={loan.id}
-                className="cursor-pointer"
-                onClick={() => setSelectedLoan(loan)}
-              >
-                <TableCell className="font-medium">
-                  {loan.borrowerName}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatCurrency(loan.amount)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {loan.interestRate}%
-                </TableCell>
-                <TableCell>
-                  {frequencyLabels[loan.paymentFrequency] ??
-                    loan.paymentFrequency}
-                </TableCell>
-                <TableCell className="tabular-nums">
-                  {formatDate(loan.startDate)}
-                </TableCell>
-                <TableCell className="tabular-nums">
-                  {formatDate(loan.dueDate)}
-                </TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon-sm">
-                        <EllipsisVerticalIcon />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => setSelectedLoan(loan)}>
-                        <EyeIcon />
-                        Ver
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          setEditError(null)
-                          setEditingLoan(loan)
-                        }}
-                      >
-                        <PencilIcon />
-                        Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onSelect={() => setDeletingLoan(loan)}
-                      >
-                        <TrashIcon />
-                        Eliminar
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+    <div>
+      <Tabs defaultValue="active">
+        <TabsList>
+          <TabsTrigger value="active">
+            Activos
+            {active.total > 0 && (
+              <span className="ml-1 rounded-full bg-primary/10 px-1.5 text-primary text-xs tabular-nums">
+                {active.total}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="due">
+            Por cobrar
+            {due.total > 0 && (
+              <span className="ml-1 rounded-full bg-primary/10 px-1.5 text-primary text-xs tabular-nums">
+                {due.total}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="overdue">
+            Vencidos
+            {overdue.total > 0 && (
+              <span className="ml-1 rounded-full bg-destructive/10 px-1.5 text-destructive text-xs tabular-nums">
+                {overdue.total}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="paid">
+            Pagados
+            {paid.total > 0 && (
+              <span className="ml-1 rounded-full bg-primary/10 px-1.5 text-primary text-xs tabular-nums">
+                {paid.total}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="flex items-center justify-between">
-        <p className="text-muted-foreground text-xs tabular-nums">
-          Mostrando {from}–{to} de {total}
-        </p>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            disabled={page <= 1}
-            onClick={() => onPageChange(page - 1)}
-          >
-            <ChevronLeftIcon />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon-sm"
-            disabled={page >= totalPages}
-            onClick={() => onPageChange(page + 1)}
-          >
-            <ChevronRightIcon />
-          </Button>
-        </div>
-      </div>
+        <TabsContent value="active">
+          <DataTable
+            columns={activeColumnsWithActions}
+            data={active.data}
+            page={active.page}
+            pageSize={active.pageSize}
+            total={active.total}
+            sorting={active.sorting}
+            onPageChange={active.setPage}
+            onPageSizeChange={active.setPageSize}
+            onSortingChange={active.setSorting}
+            onRowClick={handleViewActive}
+          />
+        </TabsContent>
+
+        <TabsContent value="due">
+          <DataTable
+            columns={dueColumnsWithActions}
+            data={due.data}
+            page={due.page}
+            pageSize={due.pageSize}
+            total={due.total}
+            sorting={due.sorting}
+            onPageChange={due.setPage}
+            onPageSizeChange={due.setPageSize}
+            onSortingChange={due.setSorting}
+            onRowClick={(row) => handleViewById(row.id, row.borrowerName)}
+          />
+        </TabsContent>
+
+        <TabsContent value="overdue">
+          <DataTable
+            columns={overdueColumnsWithActions}
+            data={overdue.data}
+            page={overdue.page}
+            pageSize={overdue.pageSize}
+            total={overdue.total}
+            sorting={overdue.sorting}
+            onPageChange={overdue.setPage}
+            onPageSizeChange={overdue.setPageSize}
+            onSortingChange={overdue.setSorting}
+            onRowClick={(row) => handleViewById(row.id, row.borrowerName)}
+          />
+        </TabsContent>
+
+        <TabsContent value="paid">
+          <DataTable
+            columns={paidColumnsWithActions}
+            data={paid.data}
+            page={paid.page}
+            pageSize={paid.pageSize}
+            total={paid.total}
+            sorting={paid.sorting}
+            onPageChange={paid.setPage}
+            onPageSizeChange={paid.setPageSize}
+            onSortingChange={paid.setSorting}
+            onRowClick={(row) => handleViewById(row.id, row.borrowerName)}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Edit Dialog */}
       <Dialog
@@ -264,13 +653,19 @@ export function LoansTable({
 
       {/* Detail Dialog */}
       <Dialog
-        open={selectedLoan !== null}
+        open={selectedLoan !== null || selectedLoanId !== null}
         onOpenChange={(open) => {
-          if (!open) setSelectedLoan(null)
+          if (!open) {
+            setSelectedLoan(null)
+            setSelectedLoanId(null)
+          }
         }}
       >
         {selectedLoan && (
-          <LoanDetail loan={selectedLoan} onPaymentChange={onPaymentChange} />
+          <LoanDetail
+            loan={selectedLoan}
+            onPaymentChange={handlePaymentChange}
+          />
         )}
       </Dialog>
 

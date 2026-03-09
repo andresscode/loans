@@ -1,16 +1,12 @@
 import { LogOutIcon, PlusIcon } from 'lucide-react'
-import { useCallback, useEffect, useReducer, useState } from 'react'
+import { useReducer, useState } from 'react'
 import { LoanForm } from '@/components/blocks/loan-form'
 import { LoansTable } from '@/components/blocks/loans-table'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { useAuth } from '@/contexts/auth-context'
 import { loansService } from '@/services/loans'
-import type {
-  CreateLoanInput,
-  LoanWithBorrower,
-  UpdateLoanInput,
-} from '@/types'
+import type { CreateLoanInput, UpdateLoanInput } from '@/types'
 
 export function HomePage() {
   const { user, logout } = useAuth()
@@ -18,22 +14,7 @@ export function HomePage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-  const [loans, setLoans] = useState<LoanWithBorrower[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
   const [refreshToken, refresh] = useReducer((x: number) => x + 1, 0)
-  const pageSize = 10
-
-  const fetchLoans = useCallback(async () => {
-    void refreshToken
-    const result = await loansService.getAll(page, pageSize)
-    setLoans(result.data)
-    setTotal(result.total)
-  }, [page, refreshToken])
-
-  useEffect(() => {
-    fetchLoans()
-  }, [fetchLoans])
 
   async function handleCreateLoan(data: CreateLoanInput) {
     setIsSubmitting(true)
@@ -42,7 +23,6 @@ export function HomePage() {
       const result = await loansService.create(data)
       if (result.success) {
         setDialogOpen(false)
-        setPage(1)
         refresh()
       } else {
         setFormError(result.error)
@@ -120,11 +100,7 @@ export function HomePage() {
 
         {/* Loans Table */}
         <LoansTable
-          loans={loans}
-          total={total}
-          page={page}
-          pageSize={pageSize}
-          onPageChange={setPage}
+          refreshToken={refreshToken}
           onEdit={handleEditLoan}
           onDelete={handleDeleteLoan}
           onPaymentChange={refresh}

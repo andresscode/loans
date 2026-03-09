@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { calculateLoan, formatCOP, type LoanCalculation } from '@/lib/loan-math'
+import {
+  analyzeLoan,
+  calculateLoan,
+  formatCOP,
+  generatePaymentSchedule,
+  type LoanAnalysis,
+  type LoanCalculation,
+  type ScheduledPayment,
+} from '@/lib/loan-math'
 
 function calcOrFail(
   params: Parameters<typeof calculateLoan>[0],
@@ -200,5 +208,226 @@ describe('calculateLoan', () => {
         )
       })
     }
+  })
+})
+
+// --- helpers for new tests ---
+
+function scheduleOrFail(
+  params: Parameters<typeof generatePaymentSchedule>[0],
+): ScheduledPayment[] {
+  const result = generatePaymentSchedule(params)
+  expect(result).not.toBeNull()
+  return result as ScheduledPayment[]
+}
+
+function analyzeOrFail(
+  params: Parameters<typeof analyzeLoan>[0],
+): LoanAnalysis {
+  const result = analyzeLoan(params)
+  expect(result).not.toBeNull()
+  return result as LoanAnalysis
+}
+
+describe('generatePaymentSchedule', () => {
+  const base = {
+    amount: 1_000_000,
+    interestRate: 5,
+    paymentFrequency: 'monthly' as const,
+    startDate: new Date('2026-01-01'),
+    dueDate: new Date('2026-07-01'),
+  }
+
+  it('returns null for invalid params', () => {
+    expect(generatePaymentSchedule({ ...base, amount: 0 })).toBeNull()
+  })
+
+  it('weekly: generates correct count and 7-day intervals', () => {
+    // 28 days → 4 weekly payments
+    const schedule = scheduleOrFail({
+      ...base,
+      paymentFrequency: 'weekly',
+      startDate: new Date('2026-01-01'),
+      dueDate: new Date('2026-01-29'),
+    })
+    expect(schedule).toHaveLength(4)
+    // First payment is startDate + 7 days
+    expect(schedule[0].date).toEqual(new Date('2026-01-08'))
+    expect(schedule[1].date).toEqual(new Date('2026-01-15'))
+    expect(schedule[2].date).toEqual(new Date('2026-01-22'))
+    expect(schedule[3].date).toEqual(new Date('2026-01-29'))
+  })
+
+  it('biweekly: generates correct count and 14-day intervals', () => {
+    // 56 days → 4 biweekly payments
+    const schedule = scheduleOrFail({
+      ...base,
+      paymentFrequency: 'biweekly',
+      startDate: new Date('2026-01-01'),
+      dueDate: new Date('2026-02-26'),
+    })
+    expect(schedule).toHaveLength(4)
+    expect(schedule[0].date).toEqual(new Date('2026-01-15'))
+    expect(schedule[1].date).toEqual(new Date('2026-01-29'))
+    expect(schedule[2].date).toEqual(new Date('2026-02-12'))
+    expect(schedule[3].date).toEqual(new Date('2026-02-26'))
+  })
+
+  it('monthly: generates correct count using addMonths', () => {
+    // Jan to Jul = 6 monthly payments
+    const schedule = scheduleOrFail(base)
+    expect(schedule).toHaveLength(6)
+    expect(schedule[0].date).toEqual(new Date('2026-02-01'))
+    expect(schedule[1].date).toEqual(new Date('2026-03-01'))
+    expect(schedule[5].date).toEqual(new Date('2026-07-01'))
+  })
+
+  it('each payment has the correct amountPerPayment', () => {
+    const schedule = scheduleOrFail(base)
+    const calc = calcOrFail(base)
+    for (const payment of schedule) {
+      expect(payment.amount).toBe(calc.amountPerPayment)
+    }
+  })
+})
+
+describe('analyzeLoan', () => {
+  // Weekly loan: start Jan 1, due Jan 29 → 4 weekly payments
+  // amountPerPayment = 1_200_000 / 4 = 300_000
+  // Payment dates: Jan 8, Jan 15, Jan 22, Jan 29
+  const weeklyBase = {
+    amount: 1_000_000,
+    interestRate: 5,
+    paymentFrequency: 'weekly' as const,
+    startDate: new Date('2026-01-01'),
+    dueDate: new Date('2026-01-29'),
+  }
+
+  it('returns null for invalid loan params', () => {
+    expect(
+      analyzeLoan({
+        ...weeklyBase,
+        amount: 0,
+        totalPaid: 0,
+        today: new Date('2026-01-10'),
+      }),
+    ).toBeNull()
+  })
+
+  it('fully paid loan', () => {
+    const result = analyzeOrFail({
+      ...weeklyBase,
+      totalPaid: 1_200_000, // exactly totalToRepay
+      today: new Date('2026-01-30'),
+    })
+    expect(result.isFullyPaid).toBe(true)
+    expect(result.progress).toBe(100)
+    expect(result.overdueCount).toBe(0)
+    expect(result.overdueTotal).toBe(0)
+  })
+
+  it('overpayment caps progress at 100', () => {
+    const result = analyzeOrFail({
+      ...weeklyBase,
+      totalPaid: 2_000_000, // more than totalToRepay
+      today: new Date('2026-01-30'),
+    })
+    expect(result.isFullyPaid).toBe(true)
+    expect(result.progress).toBe(100)
+  })
+
+  it('no payments made with installments due', () => {
+    // Today is Jan 16 → 2 payments should have been made (Jan 8, Jan 15)
+    const result = analyzeOrFail({
+      ...weeklyBase,
+      totalPaid: 0,
+      today: new Date('2026-01-16'),
+    })
+    expect(result.isFullyPaid).toBe(false)
+    expect(result.overdueCount).toBe(2)
+    expect(result.overdueTotal).toBe(600_000) // 2 * 300_000
+    expect(result.progress).toBe(0)
+  })
+
+  it('partial payments reflect the gap', () => {
+    // Today is Jan 16 → 2 payments expected
+    // Paid 1 installment worth (300_000)
+    const result = analyzeOrFail({
+      ...weeklyBase,
+      totalPaid: 300_000,
+      today: new Date('2026-01-16'),
+    })
+    expect(result.overdueCount).toBe(1) // expected 2, paid 1
+    expect(result.overdueTotal).toBe(300_000) // 2*300k - 300k
+  })
+
+  it('nothing due yet when today is before first payment', () => {
+    // Today is Jan 5 → no payments due yet (first is Jan 8)
+    const result = analyzeOrFail({
+      ...weeklyBase,
+      totalPaid: 0,
+      today: new Date('2026-01-05'),
+    })
+    expect(result.overdueCount).toBe(0)
+    expect(result.overdueTotal).toBe(0)
+    expect(result.isFullyPaid).toBe(false)
+  })
+
+  it('isDueThisWeek is true when payment falls in current Mon-Sun week', () => {
+    // Today is Wed Jan 7 → week is Mon Jan 5 – Sun Jan 11
+    // First payment is Jan 8 (Thursday) → falls in this week
+    const result = analyzeOrFail({
+      ...weeklyBase,
+      totalPaid: 0,
+      today: new Date('2026-01-07'),
+    })
+    expect(result.isDueThisWeek).toBe(true)
+    expect(result.currentPaymentAmount).toBe(300_000)
+  })
+
+  it('isDueThisWeek is false when no payment falls in current week', () => {
+    // Today is Mon Jan 12 → week is Mon Jan 12 – Sun Jan 18
+    // Payments: Jan 8, Jan 15 → Jan 15 is in this week!
+    // So let's use today = Sat Jan 3 → week is Mon Dec 29 – Sun Jan 4
+    // No payment falls in that range (first is Jan 8)
+    const result = analyzeOrFail({
+      ...weeklyBase,
+      totalPaid: 0,
+      today: new Date('2026-01-03'),
+    })
+    expect(result.isDueThisWeek).toBe(false)
+    expect(result.currentPaymentAmount).toBe(0)
+  })
+
+  it('progress reflects correct percentage', () => {
+    // totalToRepay = 1_200_000, paid 600_000 → 50%
+    const result = analyzeOrFail({
+      ...weeklyBase,
+      totalPaid: 600_000,
+      today: new Date('2026-01-30'),
+    })
+    expect(result.progress).toBe(50)
+  })
+
+  it('works with monthly frequency', () => {
+    // Monthly: Jan 1 to Jul 1 → 6 payments, amountPerPayment = 1_300_000/6
+    // Payment dates: Feb 1, Mar 1, Apr 1, May 1, Jun 1, Jul 1
+    // Today = Mar 15 → 2 payments due (Feb 1, Mar 1)
+    const monthlyBase = {
+      amount: 1_000_000,
+      interestRate: 5,
+      paymentFrequency: 'monthly' as const,
+      startDate: new Date('2026-01-01'),
+      dueDate: new Date('2026-07-01'),
+    }
+    const amountPerPayment = 1_300_000 / 6
+
+    const result = analyzeOrFail({
+      ...monthlyBase,
+      totalPaid: amountPerPayment, // paid 1 of 2 expected
+      today: new Date('2026-03-15'),
+    })
+    expect(result.overdueCount).toBe(1)
+    expect(result.overdueTotal).toBeCloseTo(amountPerPayment, 0)
   })
 })

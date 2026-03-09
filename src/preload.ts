@@ -35,6 +35,26 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id: number) => ipcRenderer.invoke('loans:delete', id),
     getAll: (params: { page: number; pageSize: number }) =>
       ipcRenderer.invoke('loans:get-all', params),
+    getActive: (params: {
+      page: number
+      pageSize: number
+      sorting: { column: string; direction: 'asc' | 'desc' } | null
+    }) => ipcRenderer.invoke('loans:get-active', params),
+    getDue: (params: {
+      page: number
+      pageSize: number
+      sorting: { column: string; direction: 'asc' | 'desc' } | null
+    }) => ipcRenderer.invoke('loans:get-due', params),
+    getOverdue: (params: {
+      page: number
+      pageSize: number
+      sorting: { column: string; direction: 'asc' | 'desc' } | null
+    }) => ipcRenderer.invoke('loans:get-overdue', params),
+    getPaid: (params: {
+      page: number
+      pageSize: number
+      sorting: { column: string; direction: 'asc' | 'desc' } | null
+    }) => ipcRenderer.invoke('loans:get-paid', params),
     searchBorrowers: (query: string) =>
       ipcRenderer.invoke('loans:search-borrowers', query),
     getPayments: (loanId: number) =>

@@ -120,3 +120,25 @@ export function deleteLoan(id: number): boolean {
   const result = getDb().prepare('DELETE FROM loans WHERE id = ?').run(id)
   return result.changes > 0
 }
+
+export type LoanWithPaymentSummary = LoanRow & {
+  borrower_name: string
+  total_paid: number
+  last_payment_date: string | null
+}
+
+export function getAllLoansWithPaymentSummary(): LoanWithPaymentSummary[] {
+  return getDb()
+    .prepare(
+      `SELECT l.id, l.borrower_id, l.amount, l.interest_rate, l.payment_frequency,
+              l.start_date, l.due_date, l.created_at, l.updated_at,
+              b.name AS borrower_name,
+              COALESCE(SUM(p.amount), 0) AS total_paid,
+              MAX(p.payment_date) AS last_payment_date
+       FROM loans l
+       INNER JOIN borrowers b ON l.borrower_id = b.id
+       LEFT JOIN payments p ON p.loan_id = l.id
+       GROUP BY l.id`,
+    )
+    .all() as LoanWithPaymentSummary[]
+}

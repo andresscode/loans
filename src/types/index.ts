@@ -72,6 +72,52 @@ export type PaginatedResult<T> = {
 
 export type LoanWithBorrower = Loan & { borrowerName: string }
 
+export type SortingParam = { column: string; direction: 'asc' | 'desc' } | null
+export type TabQueryParams = {
+  page: number
+  pageSize: number
+  sorting: SortingParam
+}
+
+// Tab 1: Activos — all non-fully-paid loans
+export type ActiveLoanRow = LoanWithBorrower & {
+  totalToRepay: number
+  totalPaid: number
+  progress: number // 0-100
+}
+
+// Tab 2: Por cobrar — loans with payment due this week
+export type DueLoanRow = {
+  id: number
+  borrowerName: string
+  currentPaymentAmount: number
+  overduePaymentsTotal: number
+  totalDue: number
+  paymentFrequency: PaymentFrequency
+  amount: number
+}
+
+// Tab 3: Vencidos — loans with overdue payments
+export type OverdueLoanRow = {
+  id: number
+  borrowerName: string
+  overdueCount: number
+  overdueTotal: number
+  lastPaymentDate: string | null
+  amount: number
+}
+
+// Tab 4: Pagados — fully paid loans
+export type PaidLoanRow = {
+  id: number
+  borrowerName: string
+  amount: number
+  totalInterest: number
+  totalPaid: number
+  startDate: string
+  closedDate: string
+}
+
 export type LoansApi = {
   create: (data: CreateLoanInput) => Promise<ActionResult<Loan>>
   update: (id: number, data: UpdateLoanInput) => Promise<ActionResult<Loan>>
@@ -80,6 +126,12 @@ export type LoansApi = {
     page: number
     pageSize: number
   }) => Promise<PaginatedResult<LoanWithBorrower>>
+  getActive: (params: TabQueryParams) => Promise<PaginatedResult<ActiveLoanRow>>
+  getDue: (params: TabQueryParams) => Promise<PaginatedResult<DueLoanRow>>
+  getOverdue: (
+    params: TabQueryParams,
+  ) => Promise<PaginatedResult<OverdueLoanRow>>
+  getPaid: (params: TabQueryParams) => Promise<PaginatedResult<PaidLoanRow>>
   searchBorrowers: (query: string) => Promise<Borrower[]>
   getPayments: (loanId: number) => Promise<Payment[]>
   createPayment: (data: CreatePaymentInput) => Promise<ActionResult<Payment>>

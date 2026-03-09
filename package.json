@@ -15,6 +15,7 @@
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",
     "@tailwindcss/vite": "^4.2.1",
+    "@tanstack/react-table": "^8.21.3",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
     "class-variance-authority": "^0.7.1",

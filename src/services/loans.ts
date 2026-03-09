@@ -1,12 +1,17 @@
 import type {
   ActionResult,
+  ActiveLoanRow,
   Borrower,
   CreateLoanInput,
   CreatePaymentInput,
+  DueLoanRow,
   Loan,
   LoanWithBorrower,
+  OverdueLoanRow,
   PaginatedResult,
+  PaidLoanRow,
   Payment,
+  TabQueryParams,
   UpdateLoanInput,
 } from '@/types'
 
@@ -28,6 +33,26 @@ export const loansService = {
     pageSize: number,
   ): Promise<PaginatedResult<LoanWithBorrower>> {
     return window.api.loans.getAll({ page, pageSize })
+  },
+
+  async getActive(
+    params: TabQueryParams,
+  ): Promise<PaginatedResult<ActiveLoanRow>> {
+    return window.api.loans.getActive(params)
+  },
+
+  async getDue(params: TabQueryParams): Promise<PaginatedResult<DueLoanRow>> {
+    return window.api.loans.getDue(params)
+  },
+
+  async getOverdue(
+    params: TabQueryParams,
+  ): Promise<PaginatedResult<OverdueLoanRow>> {
+    return window.api.loans.getOverdue(params)
+  },
+
+  async getPaid(params: TabQueryParams): Promise<PaginatedResult<PaidLoanRow>> {
+    return window.api.loans.getPaid(params)
   },
 
   async searchBorrowers(query: string): Promise<Borrower[]> {
