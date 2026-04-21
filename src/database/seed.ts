@@ -1,14 +1,17 @@
+import { addMonths } from 'date-fns'
 import { calculateLoan, generatePaymentSchedule } from '../lib/loan-math'
 import { getDb } from './index'
 
 type PaymentFrequency = 'weekly' | 'biweekly' | 'monthly'
 
+type Offset = { months?: number; weeks?: number; days?: number }
+
 type LoanSeed = {
   amount: number
   interestRate: number
   paymentFrequency: PaymentFrequency
-  startDate: string
-  dueDate: string
+  startOffset: Offset
+  dueOffset: Offset
   installmentsToPay: number
 }
 
@@ -17,8 +20,21 @@ type BorrowerSeed = {
   loans: LoanSeed[]
 }
 
-function parseDate(s: string): Date {
-  return new Date(`${s}T00:00:00`)
+function todayAnchor(): Date {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function applyOffset(base: Date, o: Offset): Date {
+  let d = base
+  if (o.months) d = addMonths(d, o.months)
+  const extraDays = (o.weeks ?? 0) * 7 + (o.days ?? 0)
+  if (extraDays) {
+    d = new Date(d)
+    d.setDate(d.getDate() + extraDays)
+  }
+  return d
 }
 
 function formatDate(d: Date): string {
@@ -30,7 +46,8 @@ function formatDate(d: Date): string {
 
 const ALL = 9999
 
-// All dates relative to today = 2026-03-09
+// Scenarios are defined relative to today so re-seeding always lands on the
+// intended mix of active / overdue / due-this-week / paid loans.
 const borrowers: BorrowerSeed[] = [
   // 1. Maria Lopez — paid monthly 6mo + active monthly 6mo, 50% progress, up-to-date
   {
@@ -40,21 +57,21 @@ const borrowers: BorrowerSeed[] = [
         amount: 500000,
         interestRate: 5,
         paymentFrequency: 'monthly',
-        startDate: '2025-03-01',
-        dueDate: '2025-09-01',
+        startOffset: { months: -12 },
+        dueOffset: { months: -6 },
         installmentsToPay: ALL,
       },
       {
         amount: 600000,
         interestRate: 4,
         paymentFrequency: 'monthly',
-        startDate: '2025-12-09',
-        dueDate: '2026-06-09',
+        startOffset: { months: -3 },
+        dueOffset: { months: 3 },
         installmentsToPay: 3,
       },
     ],
   },
-  // 2. Carlos Rivera — paid weekly 8wk + active weekly 8wk, just started (nothing due yet)
+  // 2. Carlos Rivera — paid weekly 8wk + active weekly 8wk, no payments yet
   {
     name: 'Carlos Rivera',
     loans: [
@@ -62,16 +79,16 @@ const borrowers: BorrowerSeed[] = [
         amount: 200000,
         interestRate: 3,
         paymentFrequency: 'weekly',
-        startDate: '2025-10-01',
-        dueDate: '2025-11-26',
+        startOffset: { weeks: -16 },
+        dueOffset: { weeks: -8 },
         installmentsToPay: ALL,
       },
       {
         amount: 300000,
         interestRate: 3,
         paymentFrequency: 'weekly',
-        startDate: '2026-03-05',
-        dueDate: '2026-04-30',
+        startOffset: { days: -4 },
+        dueOffset: { days: 52 },
         installmentsToPay: 0,
       },
     ],
@@ -84,16 +101,16 @@ const borrowers: BorrowerSeed[] = [
         amount: 400000,
         interestRate: 4,
         paymentFrequency: 'biweekly',
-        startDate: '2025-06-01',
-        dueDate: '2025-08-24',
+        startOffset: { weeks: -32 },
+        dueOffset: { weeks: -20 },
         installmentsToPay: ALL,
       },
       {
         amount: 450000,
         interestRate: 4,
         paymentFrequency: 'biweekly',
-        startDate: '2025-12-01',
-        dueDate: '2026-03-23',
+        startOffset: { weeks: -14 },
+        dueOffset: { weeks: 2 },
         installmentsToPay: 5,
       },
     ],
@@ -106,16 +123,16 @@ const borrowers: BorrowerSeed[] = [
         amount: 300000,
         interestRate: 5,
         paymentFrequency: 'monthly',
-        startDate: '2025-05-01',
-        dueDate: '2025-09-01',
+        startOffset: { months: -14 },
+        dueOffset: { months: -10 },
         installmentsToPay: ALL,
       },
       {
         amount: 800000,
         interestRate: 5,
         paymentFrequency: 'monthly',
-        startDate: '2025-04-09',
-        dueDate: '2026-04-09',
+        startOffset: { months: -11 },
+        dueOffset: { months: 1 },
         installmentsToPay: 10,
       },
     ],
@@ -128,16 +145,16 @@ const borrowers: BorrowerSeed[] = [
         amount: 100000,
         interestRate: 3,
         paymentFrequency: 'weekly',
-        startDate: '2025-08-01',
-        dueDate: '2025-08-29',
+        startOffset: { weeks: -20 },
+        dueOffset: { weeks: -16 },
         installmentsToPay: ALL,
       },
       {
         amount: 250000,
         interestRate: 3,
         paymentFrequency: 'weekly',
-        startDate: '2026-01-05',
-        dueDate: '2026-03-16',
+        startOffset: { weeks: -9 },
+        dueOffset: { days: 7 },
         installmentsToPay: 9,
       },
     ],
@@ -150,8 +167,8 @@ const borrowers: BorrowerSeed[] = [
         amount: 700000,
         interestRate: 5,
         paymentFrequency: 'monthly',
-        startDate: '2025-12-09',
-        dueDate: '2026-06-09',
+        startOffset: { months: -3 },
+        dueOffset: { months: 3 },
         installmentsToPay: 0,
       },
     ],
@@ -164,8 +181,8 @@ const borrowers: BorrowerSeed[] = [
         amount: 200000,
         interestRate: 3,
         paymentFrequency: 'weekly',
-        startDate: '2026-02-09',
-        dueDate: '2026-04-06',
+        startOffset: { weeks: -4 },
+        dueOffset: { weeks: 4 },
         installmentsToPay: 3,
       },
     ],
@@ -178,8 +195,8 @@ const borrowers: BorrowerSeed[] = [
         amount: 1000000,
         interestRate: 5,
         paymentFrequency: 'monthly',
-        startDate: '2025-05-09',
-        dueDate: '2026-05-09',
+        startOffset: { months: -10 },
+        dueOffset: { months: 2 },
         installmentsToPay: 10,
       },
     ],
@@ -192,13 +209,13 @@ const borrowers: BorrowerSeed[] = [
         amount: 350000,
         interestRate: 4,
         paymentFrequency: 'biweekly',
-        startDate: '2026-03-02',
-        dueDate: '2026-05-25',
+        startOffset: { days: -7 },
+        dueOffset: { weeks: 11 },
         installmentsToPay: 0,
       },
     ],
   },
-  // 10. Andres Morales — small loan, 1% interest, weekly
+  // 10. Andres Morales — small loan, 1% interest, weekly, up-to-date
   {
     name: 'Andres Morales',
     loans: [
@@ -206,13 +223,13 @@ const borrowers: BorrowerSeed[] = [
         amount: 50000,
         interestRate: 1,
         paymentFrequency: 'weekly',
-        startDate: '2026-01-19',
-        dueDate: '2026-03-30',
+        startOffset: { weeks: -7 },
+        dueOffset: { weeks: 3 },
         installmentsToPay: 7,
       },
     ],
   },
-  // 11. Camila Ortiz — large loan, 10% interest, monthly
+  // 11. Camila Ortiz — large loan, 10% interest, monthly, up-to-date
   {
     name: 'Camila Ortiz',
     loans: [
@@ -220,8 +237,8 @@ const borrowers: BorrowerSeed[] = [
         amount: 5000000,
         interestRate: 10,
         paymentFrequency: 'monthly',
-        startDate: '2025-09-09',
-        dueDate: '2026-09-09',
+        startOffset: { months: -6 },
+        dueOffset: { months: 6 },
         installmentsToPay: 6,
       },
     ],
@@ -234,8 +251,8 @@ const borrowers: BorrowerSeed[] = [
         amount: 400000,
         interestRate: 4,
         paymentFrequency: 'biweekly',
-        startDate: '2025-12-15',
-        dueDate: '2026-03-23',
+        startOffset: { weeks: -12 },
+        dueOffset: { weeks: 2 },
         installmentsToPay: 4,
       },
     ],
@@ -248,13 +265,13 @@ const borrowers: BorrowerSeed[] = [
         amount: 300000,
         interestRate: 3,
         paymentFrequency: 'weekly',
-        startDate: '2026-01-19',
-        dueDate: '2026-03-30',
+        startOffset: { weeks: -7 },
+        dueOffset: { weeks: 3 },
         installmentsToPay: 6,
       },
     ],
   },
-  // 14. Mateo Diaz — monthly, 0% interest
+  // 14. Mateo Diaz — monthly, 0% interest, up-to-date
   {
     name: 'Mateo Diaz',
     loans: [
@@ -262,8 +279,8 @@ const borrowers: BorrowerSeed[] = [
         amount: 500000,
         interestRate: 0,
         paymentFrequency: 'monthly',
-        startDate: '2025-09-09',
-        dueDate: '2026-09-09',
+        startOffset: { months: -6 },
+        dueOffset: { months: 6 },
         installmentsToPay: 6,
       },
     ],
@@ -276,8 +293,8 @@ const borrowers: BorrowerSeed[] = [
         amount: 800000,
         interestRate: 5,
         paymentFrequency: 'monthly',
-        startDate: '2025-06-09',
-        dueDate: '2026-06-09',
+        startOffset: { months: -9 },
+        dueOffset: { months: 3 },
         installmentsToPay: 9,
       },
     ],
@@ -290,6 +307,8 @@ export function seedDatabase(): void {
     .prepare('SELECT COUNT(*) AS count FROM borrowers')
     .get() as { count: number }
   if (count > 0) return
+
+  const anchor = todayAnchor()
 
   const insertBorrower = db.prepare('INSERT INTO borrowers (name) VALUES (?)')
   const insertLoan = db.prepare(
@@ -304,13 +323,16 @@ export function seedDatabase(): void {
       const { lastInsertRowid: borrowerId } = insertBorrower.run(borrower.name)
 
       for (const loan of borrower.loans) {
+        const startDate = applyOffset(anchor, loan.startOffset)
+        const dueDate = applyOffset(anchor, loan.dueOffset)
+
         const { lastInsertRowid: loanId } = insertLoan.run(
           borrowerId,
           loan.amount,
           loan.interestRate,
           loan.paymentFrequency,
-          loan.startDate,
-          loan.dueDate,
+          formatDate(startDate),
+          formatDate(dueDate),
         )
 
         if (loan.installmentsToPay <= 0) continue
@@ -319,8 +341,8 @@ export function seedDatabase(): void {
           amount: loan.amount,
           interestRate: loan.interestRate,
           paymentFrequency: loan.paymentFrequency,
-          startDate: parseDate(loan.startDate),
-          dueDate: parseDate(loan.dueDate),
+          startDate,
+          dueDate,
         })
         if (!calc) continue
 
@@ -328,8 +350,8 @@ export function seedDatabase(): void {
           amount: loan.amount,
           interestRate: loan.interestRate,
           paymentFrequency: loan.paymentFrequency,
-          startDate: parseDate(loan.startDate),
-          dueDate: parseDate(loan.dueDate),
+          startDate,
+          dueDate,
         })
         if (!schedule) continue
 

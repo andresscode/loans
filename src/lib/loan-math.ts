@@ -24,6 +24,21 @@ function countMonths(start: Date, end: Date): number {
   )
 }
 
+function stripTime(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+function monthsBetween(start: Date, end: Date): number {
+  let wholeMonths = 0
+  while (addMonths(start, wholeMonths + 1) <= end) {
+    wholeMonths++
+  }
+  const anchor = addMonths(start, wholeMonths)
+  const remainderDays =
+    (end.getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24)
+  return wholeMonths + Math.max(0, remainderDays) / 30
+}
+
 export function calculateLoan(params: {
   amount: number
   interestRate: number
@@ -31,7 +46,9 @@ export function calculateLoan(params: {
   startDate: Date
   dueDate: Date
 }): LoanCalculation | null {
-  const { amount, interestRate, paymentFrequency, startDate, dueDate } = params
+  const { amount, interestRate, paymentFrequency } = params
+  const startDate = stripTime(params.startDate)
+  const dueDate = stripTime(params.dueDate)
 
   if (amount <= 0) return null
   if (interestRate < 0) return null
@@ -52,7 +69,8 @@ export function calculateLoan(params: {
 
   if (numberOfPayments <= 0) return null
 
-  const totalInterest = amount * (interestRate / 100) * numberOfPayments
+  const loanMonths = monthsBetween(startDate, dueDate)
+  const totalInterest = amount * (interestRate / 100) * loanMonths
   const totalToRepay = amount + totalInterest
   const amountPerPayment = totalToRepay / numberOfPayments
 
