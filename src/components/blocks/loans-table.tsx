@@ -40,6 +40,8 @@ import type {
   SortingParam,
   UpdateLoanInput,
 } from '@/types'
+import { BorrowerCell } from './borrower-cell'
+import { MoneyCell } from './money-cell'
 
 const frequencyLabels: Record<string, string> = {
   weekly: 'Semanal',
@@ -72,69 +74,35 @@ function toSortingParam(sorting: SortingState): SortingParam {
 // --- Column definitions ---
 
 const activeColumns: ColumnDef<ActiveLoanRow, unknown>[] = [
-  { accessorKey: 'borrowerName', header: 'Prestatario', enableSorting: true },
+  {
+    accessorKey: 'borrowerName',
+    header: 'Nombre Deudor',
+    enableSorting: true,
+    cell: ({ row }) => <BorrowerCell name={row.original.borrowerName} />,
+  },
   {
     accessorKey: 'amount',
-    header: 'Monto',
+    header: 'Total Prestado',
     enableSorting: true,
     cell: ({ row }) => (
-      <span className="tabular-nums">
-        {formatCurrency(row.original.amount)}
-      </span>
+      <MoneyCell
+        headlineValue={row.original.totalToRepay}
+        subheadlineValue={row.original.totalToRepay - row.original.amount}
+        subheadlineLabel="Interés"
+      />
     ),
   },
   {
-    accessorKey: 'interestRate',
-    header: 'Tasa',
+    accessorKey: 'pending',
+    header: 'Deuda Pendiente',
     enableSorting: true,
     cell: ({ row }) => (
-      <span className="tabular-nums">{row.original.interestRate}%</span>
+      <MoneyCell
+        headlineValue={row.original.pending}
+        subheadlineValue={row.original.totalToRepay - row.original.pending}
+        subheadlineLabel="Pagado"
+      />
     ),
-  },
-  {
-    accessorKey: 'paymentFrequency',
-    header: 'Frecuencia',
-    enableSorting: false,
-    cell: ({ row }) =>
-      frequencyLabels[row.original.paymentFrequency] ??
-      row.original.paymentFrequency,
-  },
-  {
-    accessorKey: 'startDate',
-    header: 'Fecha de inicio',
-    enableSorting: true,
-    cell: ({ row }) => (
-      <span className="tabular-nums">{formatDate(row.original.startDate)}</span>
-    ),
-  },
-  {
-    accessorKey: 'dueDate',
-    header: 'Fecha de vencimiento',
-    enableSorting: true,
-    cell: ({ row }) => (
-      <span className="tabular-nums">{formatDate(row.original.dueDate)}</span>
-    ),
-  },
-  {
-    accessorKey: 'progress',
-    header: 'Progreso',
-    enableSorting: true,
-    cell: ({ row }) => {
-      const { totalPaid, totalToRepay, progress } = row.original
-      return (
-        <div className="flex items-center gap-2">
-          <div className="h-1.5 w-16 rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <span className="text-muted-foreground text-xs tabular-nums">
-            {formatCurrency(totalPaid)} / {formatCurrency(totalToRepay)}
-          </span>
-        </div>
-      )
-    },
   },
 ]
 

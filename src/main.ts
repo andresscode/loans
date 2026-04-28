@@ -388,6 +388,7 @@ function registerIpcHandlers() {
         borrowerName: row.borrower_name,
         totalToRepay: analysis.totalToRepay,
         totalPaid: analysis.totalPaid,
+        pending: Math.max(0, analysis.totalToRepay - analysis.totalPaid),
         progress: analysis.progress,
       }))
     return paginate(active, params, { column: 'createdAt', direction: 'desc' })

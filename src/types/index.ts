@@ -83,6 +83,7 @@ export type TabQueryParams = {
 export type ActiveLoanRow = LoanWithBorrower & {
   totalToRepay: number
   totalPaid: number
+  pending: number
   progress: number // 0-100
 }
 
