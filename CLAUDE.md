@@ -34,7 +34,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Database
 
-- **SQLite** via `better-sqlite3` (synchronous), stored at `app.getPath('userData')/mis-prestamos.db`
+- **SQLite** via `better-sqlite3` (synchronous), stored at `app.getPath('userData')/loans-app.db`
 - Schema defined inline in `src/database/index.ts` using `CREATE TABLE IF NOT EXISTS`
 - Pragmas: WAL mode, foreign keys ON
 - Query pattern: `getDb().prepare(sql).run/get/all()` with parameterized queries

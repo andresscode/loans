@@ -1,6 +1,6 @@
 import type { ActionResult, User } from '@/types'
 
-const TOKEN_KEY = 'mis-prestamos-session-token'
+const TOKEN_KEY = 'loans-app-session-token'
 
 export const authService = {
   async hasUsers(): Promise<boolean> {
