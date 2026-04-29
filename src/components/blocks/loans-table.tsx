@@ -42,8 +42,8 @@ import type {
   UpdateLoanInput,
 } from '@/types'
 import { ActiveLoansSummaryCards } from './active-loans-summary'
+import { AmountCell } from './amount-cell'
 import { BorrowerCell } from './borrower-cell'
-import { MoneyCell } from './money-cell'
 
 const frequencyLabels: Record<string, string> = {
   weekly: 'Semanal',
@@ -78,19 +78,25 @@ function toSortingParam(sorting: SortingState): SortingParam {
 const activeColumns: ColumnDef<ActiveLoanRow, unknown>[] = [
   {
     accessorKey: 'borrowerName',
-    header: 'Nombre del Deudor',
+    header: 'Deudor',
     enableSorting: true,
     cell: ({ row }) => <BorrowerCell name={row.original.borrowerName} />,
   },
   {
     accessorKey: 'amount',
-    header: 'Total a Cobrar',
+    header: 'Monto Total',
     enableSorting: true,
     cell: ({ row }) => (
-      <MoneyCell
-        headlineValue={row.original.totalToRepay}
-        subheadlineValue={row.original.totalToRepay - row.original.amount}
-        subheadlineLabel="Interés"
+      <AmountCell
+        headline={row.original.totalToRepay}
+        details={[
+          { label: 'Capital', value: row.original.amount, color: 'blue' },
+          {
+            label: 'Interés',
+            value: row.original.totalToRepay - row.original.amount,
+            color: 'green',
+          },
+        ]}
       />
     ),
   },
@@ -99,10 +105,10 @@ const activeColumns: ColumnDef<ActiveLoanRow, unknown>[] = [
     header: 'Saldo Pendiente',
     enableSorting: true,
     cell: ({ row }) => (
-      <MoneyCell
-        headlineValue={row.original.pending}
-        subheadlineValue={row.original.totalToRepay - row.original.pending}
-        subheadlineLabel="Pagado"
+      <AmountCell
+        headline={row.original.pending}
+        progressValue={row.original.progress}
+        progressText={`${Math.round(row.original.progress)}% pagado`}
       />
     ),
   },

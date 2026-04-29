@@ -1,7 +1,7 @@
 import { HandCoinsIcon, LandmarkIcon, PiggyBankIcon } from 'lucide-react'
 import type { ActiveLoansSummary } from '@/types'
+import { formatCop } from './amount-cell'
 import DashboardCard from './dashboard-card'
-import { formatCop } from './money-cell'
 
 type Props = {
   summary: ActiveLoansSummary | null
