@@ -5,8 +5,13 @@ import {
   PencilIcon,
   TrashIcon,
 } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useCallback, useEffect, useReducer, useState } from 'react'
-import { DataTable } from '@/components/blocks/data-table'
+import {
+  DataTable,
+  DataTableColumnsMenu,
+  useDataTable,
+} from '@/components/blocks/data-table'
 import { EditLoanForm } from '@/components/blocks/edit-loan-form'
 import { LoanDetail } from '@/components/blocks/loan-detail'
 import {
@@ -385,14 +390,19 @@ type LoansTableProps = {
   onDelete: (id: number) => Promise<boolean>
   onPaymentChange?: () => void
   refreshToken: number
+  toolbarActions?: ReactNode
 }
+
+type TabKey = 'active' | 'due' | 'overdue' | 'paid'
 
 export function LoansTable({
   onEdit,
   onDelete,
   onPaymentChange,
   refreshToken,
+  toolbarActions,
 }: LoansTableProps) {
+  const [activeTab, setActiveTab] = useState<TabKey>('active')
   const [selectedLoanId, setSelectedLoanId] = useState<number | null>(null)
   const [selectedLoan, setSelectedLoan] = useState<LoanWithBorrower | null>(
     null,
@@ -518,101 +528,138 @@ export function LoansTable({
     }),
   ]
 
+  const activeTable = useDataTable({
+    data: active.data,
+    columns: activeColumnsWithActions,
+    total: active.total,
+    sorting: active.sorting,
+    onSortingChange: active.setSorting,
+  })
+  const dueTable = useDataTable({
+    data: due.data,
+    columns: dueColumnsWithActions,
+    total: due.total,
+    sorting: due.sorting,
+    onSortingChange: due.setSorting,
+  })
+  const overdueTable = useDataTable({
+    data: overdue.data,
+    columns: overdueColumnsWithActions,
+    total: overdue.total,
+    sorting: overdue.sorting,
+    onSortingChange: overdue.setSorting,
+  })
+  const paidTable = useDataTable({
+    data: paid.data,
+    columns: paidColumnsWithActions,
+    total: paid.total,
+    sorting: paid.sorting,
+    onSortingChange: paid.setSorting,
+  })
+
+  // biome-ignore lint/suspicious/noExplicitAny: ColumnsMenu only reads column metadata, so TData doesn't matter at this site.
+  const tablesByTab: Record<TabKey, ReturnType<typeof useDataTable<any>>> = {
+    active: activeTable,
+    due: dueTable,
+    overdue: overdueTable,
+    paid: paidTable,
+  }
+
   return (
     <div>
-      <Tabs defaultValue="active">
-        <TabsList>
-          <TabsTrigger value="active">
-            Activos
-            {active.total > 0 && (
-              <span className="ml-1 rounded-full bg-primary/10 px-1.5 text-primary text-xs tabular-nums">
-                {active.total}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="due">
-            Por cobrar
-            {due.total > 0 && (
-              <span className="ml-1 rounded-full bg-primary/10 px-1.5 text-primary text-xs tabular-nums">
-                {due.total}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="overdue">
-            Vencidos
-            {overdue.total > 0 && (
-              <span className="ml-1 rounded-full bg-destructive/10 px-1.5 text-destructive text-xs tabular-nums">
-                {overdue.total}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="paid">
-            Pagados
-            {paid.total > 0 && (
-              <span className="ml-1 rounded-full bg-primary/10 px-1.5 text-primary text-xs tabular-nums">
-                {paid.total}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
+      {activeTab === 'active' && (
+        <ActiveLoansSummaryCards summary={activeSummary} />
+      )}
+
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as TabKey)}
+      >
+        <div className="my-4 flex items-center justify-between gap-2">
+          <TabsList>
+            <TabsTrigger value="active">
+              Activos
+              {active.total > 0 && (
+                <span className="ml-1 rounded-full bg-primary/10 px-1.5 text-primary text-xs tabular-nums">
+                  {active.total}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="due">
+              Por cobrar
+              {due.total > 0 && (
+                <span className="ml-1 rounded-full bg-primary/10 px-1.5 text-primary text-xs tabular-nums">
+                  {due.total}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="overdue">
+              Vencidos
+              {overdue.total > 0 && (
+                <span className="ml-1 rounded-full bg-destructive/10 px-1.5 text-destructive text-xs tabular-nums">
+                  {overdue.total}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="paid">
+              Pagados
+              {paid.total > 0 && (
+                <span className="ml-1 rounded-full bg-primary/10 px-1.5 text-primary text-xs tabular-nums">
+                  {paid.total}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+          <div className="flex items-center gap-2">
+            <DataTableColumnsMenu table={tablesByTab[activeTab]} />
+            {toolbarActions}
+          </div>
+        </div>
 
         <TabsContent value="active">
-          <ActiveLoansSummaryCards summary={activeSummary} />
           <DataTable
-            columns={activeColumnsWithActions}
-            data={active.data}
+            table={activeTable}
             page={active.page}
             pageSize={active.pageSize}
             total={active.total}
-            sorting={active.sorting}
             onPageChange={active.setPage}
             onPageSizeChange={active.setPageSize}
-            onSortingChange={active.setSorting}
             onRowClick={handleViewActive}
           />
         </TabsContent>
 
         <TabsContent value="due">
           <DataTable
-            columns={dueColumnsWithActions}
-            data={due.data}
+            table={dueTable}
             page={due.page}
             pageSize={due.pageSize}
             total={due.total}
-            sorting={due.sorting}
             onPageChange={due.setPage}
             onPageSizeChange={due.setPageSize}
-            onSortingChange={due.setSorting}
             onRowClick={(row) => handleViewById(row.id, row.borrowerName)}
           />
         </TabsContent>
 
         <TabsContent value="overdue">
           <DataTable
-            columns={overdueColumnsWithActions}
-            data={overdue.data}
+            table={overdueTable}
             page={overdue.page}
             pageSize={overdue.pageSize}
             total={overdue.total}
-            sorting={overdue.sorting}
             onPageChange={overdue.setPage}
             onPageSizeChange={overdue.setPageSize}
-            onSortingChange={overdue.setSorting}
             onRowClick={(row) => handleViewById(row.id, row.borrowerName)}
           />
         </TabsContent>
 
         <TabsContent value="paid">
           <DataTable
-            columns={paidColumnsWithActions}
-            data={paid.data}
+            table={paidTable}
             page={paid.page}
             pageSize={paid.pageSize}
             total={paid.total}
-            sorting={paid.sorting}
             onPageChange={paid.setPage}
             onPageSizeChange={paid.setPageSize}
-            onSortingChange={paid.setSorting}
             onRowClick={(row) => handleViewById(row.id, row.borrowerName)}
           />
         </TabsContent>

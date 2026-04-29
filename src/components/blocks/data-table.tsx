@@ -3,6 +3,7 @@ import {
   flexRender,
   getCoreRowModel,
   type OnChangeFn,
+  type Table as ReactTable,
   type SortingState,
   useReactTable,
   type VisibilityState,
@@ -43,78 +44,96 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
-type DataTableProps<TData> = {
-  columns: ColumnDef<TData, unknown>[]
+type UseDataTableOptions<TData> = {
   data: TData[]
-  page: number
-  pageSize: number
+  columns: ColumnDef<TData, unknown>[]
   total: number
   sorting?: SortingState
-  onPageChange: (page: number) => void
-  onPageSizeChange: (size: number) => void
   onSortingChange?: OnChangeFn<SortingState>
-  onRowClick?: (row: TData) => void
 }
 
-export function DataTable<TData>({
-  columns,
+export function useDataTable<TData>({
   data,
-  page,
-  pageSize,
+  columns,
   total,
   sorting = [],
-  onPageChange,
-  onPageSizeChange,
   onSortingChange,
-  onRowClick,
-}: DataTableProps<TData>) {
+}: UseDataTableOptions<TData>) {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-
-  const table = useReactTable({
+  return useReactTable({
     data,
     columns,
     state: { sorting, columnVisibility },
-    onSortingChange: onSortingChange,
+    onSortingChange,
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     manualSorting: true,
     rowCount: total,
   })
+}
+
+type DataTableColumnsMenuProps<TData> = {
+  table: ReactTable<TData>
+}
+
+export function DataTableColumnsMenu<TData>({
+  table,
+}: DataTableColumnsMenuProps<TData>) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" className="shadow-xs">
+          <Columns3Icon />
+          Columnas
+          <ChevronDownIcon />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-40">
+        {table
+          .getAllColumns()
+          .filter((col) => col.getCanHide())
+          .map((col) => (
+            <DropdownMenuCheckboxItem
+              key={col.id}
+              checked={col.getIsVisible()}
+              onCheckedChange={(value) => col.toggleVisibility(!!value)}
+            >
+              {typeof col.columnDef.header === 'string'
+                ? col.columnDef.header
+                : col.id}
+            </DropdownMenuCheckboxItem>
+          ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+type DataTableProps<TData> = {
+  table: ReactTable<TData>
+  page: number
+  pageSize: number
+  total: number
+  onPageChange: (page: number) => void
+  onPageSizeChange: (size: number) => void
+  onRowClick?: (row: TData) => void
+}
+
+export function DataTable<TData>({
+  table,
+  page,
+  pageSize,
+  total,
+  onPageChange,
+  onPageSizeChange,
+  onRowClick,
+}: DataTableProps<TData>) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const visibleColumnCount = table.getVisibleLeafColumns().length
 
   return (
     <div className="space-y-3">
-      {/* Toolbar */}
-      <div className="flex items-center justify-end">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Columns3Icon />
-              Columnas
-              <ChevronDownIcon />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            {table
-              .getAllColumns()
-              .filter((col) => col.getCanHide())
-              .map((col) => (
-                <DropdownMenuCheckboxItem
-                  key={col.id}
-                  checked={col.getIsVisible()}
-                  onCheckedChange={(value) => col.toggleVisibility(!!value)}
-                >
-                  {typeof col.columnDef.header === 'string'
-                    ? col.columnDef.header
-                    : col.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
       {/* Table */}
       <div className="overflow-hidden rounded-lg border">
         <Table>
@@ -173,7 +192,7 @@ export function DataTable<TData>({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={visibleColumnCount}
                   className="h-24 text-center text-muted-foreground"
                 >
                   No hay resultados.

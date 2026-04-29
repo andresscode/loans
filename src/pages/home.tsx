@@ -74,36 +74,36 @@ export function HomePage() {
 
       {/* Content */}
       <main className="mx-auto max-w-5xl px-6 py-6">
-        {/* Subheader */}
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="font-semibold text-lg tracking-tight">Prestamos</h2>
-          <Dialog
-            open={dialogOpen}
-            onOpenChange={(open) => {
-              setDialogOpen(open)
-              if (!open) setFormError(null)
-            }}
-          >
-            <Button size="sm" onClick={() => setDialogOpen(true)}>
-              <PlusIcon />
-              Nuevo prestamo
-            </Button>
-            {dialogOpen && (
-              <LoanForm
-                isSubmitting={isSubmitting}
-                error={formError}
-                onSubmit={handleCreateLoan}
-              />
-            )}
-          </Dialog>
-        </div>
-
-        {/* Loans Table */}
         <LoansTable
           refreshToken={refreshToken}
           onEdit={handleEditLoan}
           onDelete={handleDeleteLoan}
           onPaymentChange={refresh}
+          toolbarActions={
+            <Dialog
+              open={dialogOpen}
+              onOpenChange={(open) => {
+                setDialogOpen(open)
+                if (!open) setFormError(null)
+              }}
+            >
+              <Button
+                variant="outline"
+                onClick={() => setDialogOpen(true)}
+                className="shadow-xs"
+              >
+                <PlusIcon />
+                Nuevo prestamo
+              </Button>
+              {dialogOpen && (
+                <LoanForm
+                  isSubmitting={isSubmitting}
+                  error={formError}
+                  onSubmit={handleCreateLoan}
+                />
+              )}
+            </Dialog>
+          }
         />
       </main>
     </div>
