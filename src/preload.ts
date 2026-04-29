@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('api', {
       pageSize: number
       sorting: { column: string; direction: 'asc' | 'desc' } | null
     }) => ipcRenderer.invoke('loans:get-active', params),
+    getActiveSummary: () => ipcRenderer.invoke('loans:get-active-summary'),
     getDue: (params: {
       page: number
       pageSize: number

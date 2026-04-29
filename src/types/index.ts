@@ -87,6 +87,14 @@ export type ActiveLoanRow = LoanWithBorrower & {
   progress: number // 0-100
 }
 
+export type ActiveLoansSummary = {
+  totalCapital: number
+  totalExpectedInterest: number
+  totalPaid: number
+  totalPending: number
+  loanCount: number
+}
+
 // Tab 2: Por cobrar — loans with payment due this week
 export type DueLoanRow = {
   id: number
@@ -128,6 +136,7 @@ export type LoansApi = {
     pageSize: number
   }) => Promise<PaginatedResult<LoanWithBorrower>>
   getActive: (params: TabQueryParams) => Promise<PaginatedResult<ActiveLoanRow>>
+  getActiveSummary: () => Promise<ActiveLoansSummary>
   getDue: (params: TabQueryParams) => Promise<PaginatedResult<DueLoanRow>>
   getOverdue: (
     params: TabQueryParams,

@@ -24,6 +24,7 @@ import { authenticateUser, createUser, getUserCount } from './database/users'
 import { analyzeLoan } from './lib/loan-math'
 import type {
   ActiveLoanRow,
+  ActiveLoansSummary,
   DueLoanRow,
   OverdueLoanRow,
   PaidLoanRow,
@@ -392,6 +393,28 @@ function registerIpcHandlers() {
         progress: analysis.progress,
       }))
     return paginate(active, params, { column: 'createdAt', direction: 'desc' })
+  })
+
+  ipcMain.handle('loans:get-active-summary', (): ActiveLoansSummary => {
+    const all = analyzeAllLoans()
+    const active = all.filter(({ analysis }) => !analysis.isFullyPaid)
+    let totalCapital = 0
+    let totalExpectedInterest = 0
+    let totalPaid = 0
+    let totalPending = 0
+    for (const { row, analysis } of active) {
+      totalCapital += row.amount
+      totalExpectedInterest += analysis.totalToRepay - row.amount
+      totalPaid += analysis.totalPaid
+      totalPending += Math.max(0, analysis.totalToRepay - analysis.totalPaid)
+    }
+    return {
+      totalCapital,
+      totalExpectedInterest,
+      totalPaid,
+      totalPending,
+      loanCount: active.length,
+    }
   })
 
   ipcMain.handle('loans:get-due', (_event, params: TabQueryParams) => {

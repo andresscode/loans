@@ -33,6 +33,7 @@ import { parseLocalDate } from '@/lib/utils'
 import { loansService } from '@/services/loans'
 import type {
   ActiveLoanRow,
+  ActiveLoansSummary,
   DueLoanRow,
   LoanWithBorrower,
   OverdueLoanRow,
@@ -40,6 +41,7 @@ import type {
   SortingParam,
   UpdateLoanInput,
 } from '@/types'
+import { ActiveLoansSummaryCards } from './active-loans-summary'
 import { BorrowerCell } from './borrower-cell'
 import { MoneyCell } from './money-cell'
 
@@ -76,13 +78,13 @@ function toSortingParam(sorting: SortingState): SortingParam {
 const activeColumns: ColumnDef<ActiveLoanRow, unknown>[] = [
   {
     accessorKey: 'borrowerName',
-    header: 'Nombre Deudor',
+    header: 'Nombre del Deudor',
     enableSorting: true,
     cell: ({ row }) => <BorrowerCell name={row.original.borrowerName} />,
   },
   {
     accessorKey: 'amount',
-    header: 'Total Prestado',
+    header: 'Total a Cobrar',
     enableSorting: true,
     cell: ({ row }) => (
       <MoneyCell
@@ -94,7 +96,7 @@ const activeColumns: ColumnDef<ActiveLoanRow, unknown>[] = [
   },
   {
     accessorKey: 'pending',
-    header: 'Deuda Pendiente',
+    header: 'Saldo Pendiente',
     enableSorting: true,
     cell: ({ row }) => (
       <MoneyCell
@@ -395,6 +397,16 @@ export function LoansTable({
   const [editError, setEditError] = useState<string | null>(null)
 
   const active = useTabData<ActiveLoanRow>(loansService.getActive, refreshToken)
+  const [activeSummary, setActiveSummary] = useState<ActiveLoansSummary | null>(
+    null,
+  )
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshToken is the trigger
+  useEffect(() => {
+    loansService
+      .getActiveSummary()
+      .then(setActiveSummary)
+      .catch((err) => console.error('getActiveSummary failed', err))
+  }, [refreshToken])
   const due = useTabData<DueLoanRow>(loansService.getDue, refreshToken)
   const overdue = useTabData<OverdueLoanRow>(
     loansService.getOverdue,
@@ -539,6 +551,7 @@ export function LoansTable({
         </TabsList>
 
         <TabsContent value="active">
+          <ActiveLoansSummaryCards summary={activeSummary} />
           <DataTable
             columns={activeColumnsWithActions}
             data={active.data}

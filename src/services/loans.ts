@@ -1,6 +1,7 @@
 import type {
   ActionResult,
   ActiveLoanRow,
+  ActiveLoansSummary,
   Borrower,
   CreateLoanInput,
   CreatePaymentInput,
@@ -39,6 +40,10 @@ export const loansService = {
     params: TabQueryParams,
   ): Promise<PaginatedResult<ActiveLoanRow>> {
     return window.api.loans.getActive(params)
+  },
+
+  async getActiveSummary(): Promise<ActiveLoansSummary> {
+    return window.api.loans.getActiveSummary()
   },
 
   async getDue(params: TabQueryParams): Promise<PaginatedResult<DueLoanRow>> {
