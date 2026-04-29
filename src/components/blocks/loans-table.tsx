@@ -89,7 +89,7 @@ const activeColumns: ColumnDef<ActiveLoanRow, unknown>[] = [
   },
   {
     accessorKey: 'amount',
-    header: 'Monto Total',
+    header: 'Monto total',
     enableSorting: true,
     cell: ({ row }) => (
       <AmountCell
@@ -107,7 +107,7 @@ const activeColumns: ColumnDef<ActiveLoanRow, unknown>[] = [
   },
   {
     accessorKey: 'pending',
-    header: 'Saldo Pendiente',
+    header: 'Saldo pendiente',
     enableSorting: true,
     cell: ({ row }) => (
       <AmountCell

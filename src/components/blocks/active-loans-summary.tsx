@@ -20,21 +20,21 @@ export function ActiveLoansSummaryCards({ summary }: Props) {
   return (
     <div className="my-4 flex justify-between gap-4">
       <DashboardCard
-        description="Capital Prestado"
+        description="Capital prestado"
         title={formatCop(totalCapital)}
         subtitle={`+ ${formatCop(totalExpectedInterest)} en intereses esperados`}
         Icon={LandmarkIcon}
         iconColor="blue"
       />
       <DashboardCard
-        description="Total Cobrado"
+        description="Total cobrado"
         title={formatCop(totalPaid)}
         subtitle={`de ${formatCop(totalToCollect)} (${collectedPct}%)`}
         Icon={PiggyBankIcon}
         iconColor="green"
       />
       <DashboardCard
-        description="Pendiente por Cobrar"
+        description="Pendiente por cobrar"
         title={formatCop(totalPending)}
         subtitle={`en ${loanCount} ${loanCount === 1 ? 'préstamo activo' : 'préstamos activos'}`}
         Icon={HandCoinsIcon}
