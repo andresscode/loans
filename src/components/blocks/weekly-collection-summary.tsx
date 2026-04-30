@@ -41,9 +41,6 @@ export function WeeklyCollectionSummaryCards({ summary }: Props) {
   const isPastWeek = summary?.isPastWeek ?? false
   const isCurrentWeek = summary?.isCurrentWeek ?? false
 
-  const collectedPct =
-    expected > 0 ? Math.round((collected / expected) * 100) : 0
-
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -80,10 +77,26 @@ export function WeeklyCollectionSummaryCards({ summary }: Props) {
     thirdColor = 'slate'
   }
 
+  const pendingCount = Math.max(0, borrowerCount - paidCount)
+  const pendingS = pendingCount === 1 ? '' : 's'
   const pagoS = paidCount === 1 ? '' : 's'
-  const personaS = borrowerCount === 1 ? '' : 's'
-  const collectedSubtitle = `en ${paidCount} pago${pagoS} recibido${pagoS} (${collectedPct}%)`
-  const expectedSubtitle = `a ${borrowerCount} persona${personaS} esta semana`
+  const collectedSubtitle =
+    paidCount === 0
+      ? 'No se han recibido pagos'
+      : `en ${paidCount} pago${pagoS} recibido${pagoS}`
+  const cobroS = borrowerCount === 1 ? '' : 's'
+  let expectedSubtitle: string
+  if (borrowerCount === 0) {
+    expectedSubtitle = 'Sin cobros programados'
+  } else if (pendingCount === 0) {
+    expectedSubtitle = 'No hay cobros pendientes'
+  } else if (isPastWeek) {
+    expectedSubtitle = `Faltaron ${pendingCount} persona${pendingS} por pagar`
+  } else if (isCurrentWeek) {
+    expectedSubtitle = `Hay ${pendingCount} persona${pendingS} pendiente${pendingS} por pagar`
+  } else {
+    expectedSubtitle = `en ${borrowerCount} cobro${cobroS} programado${cobroS}`
+  }
 
   return (
     <div className="my-4 flex justify-between gap-4">
