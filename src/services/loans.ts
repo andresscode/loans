@@ -14,6 +14,10 @@ import type {
   Payment,
   TabQueryParams,
   UpdateLoanInput,
+  UpdatePaymentInput,
+  WeeklyCollectionRow,
+  WeeklyCollectionSummary,
+  WeeklyQueryParams,
 } from '@/types'
 
 export const loansService = {
@@ -60,6 +64,19 @@ export const loansService = {
     return window.api.loans.getPaid(params)
   },
 
+  async getWeeklyCollection(
+    params: WeeklyQueryParams,
+  ): Promise<PaginatedResult<WeeklyCollectionRow>> {
+    return window.api.loans.getWeeklyCollection(params)
+  },
+
+  async getWeeklySummary(params: {
+    weekStart: string
+    search?: string
+  }): Promise<WeeklyCollectionSummary> {
+    return window.api.loans.getWeeklySummary(params)
+  },
+
   async searchBorrowers(query: string): Promise<Borrower[]> {
     return window.api.loans.searchBorrowers(query)
   },
@@ -72,6 +89,13 @@ export const loansService = {
     data: CreatePaymentInput,
   ): Promise<ActionResult<Payment>> {
     return window.api.loans.createPayment(data)
+  },
+
+  async updatePayment(
+    id: number,
+    data: UpdatePaymentInput,
+  ): Promise<ActionResult<Payment>> {
+    return window.api.loans.updatePayment(id, data)
   },
 
   async deletePayment(id: number): Promise<ActionResult> {

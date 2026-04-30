@@ -1,4 +1,4 @@
-import { HandCoinsIcon, LandmarkIcon, PiggyBankIcon } from 'lucide-react'
+import { AlertCircleIcon, HandCoinsIcon, LandmarkIcon } from 'lucide-react'
 import type { ActiveLoansSummary } from '@/types'
 import { formatCop } from './amount-cell'
 import DashboardCard from './dashboard-card'
@@ -27,17 +27,17 @@ export function ActiveLoansSummaryCards({ summary }: Props) {
         iconColor="blue"
       />
       <DashboardCard
-        description="Total cobrado"
+        description="Total recaudado"
         title={formatCop(totalPaid)}
         subtitle={`de ${formatCop(totalToCollect)} (${collectedPct}%)`}
-        Icon={PiggyBankIcon}
-        iconColor="green"
+        Icon={HandCoinsIcon}
+        iconColor="purple"
       />
       <DashboardCard
         description="Pendiente por cobrar"
         title={formatCop(totalPending)}
         subtitle={`en ${loanCount} ${loanCount === 1 ? 'préstamo activo' : 'préstamos activos'}`}
-        Icon={HandCoinsIcon}
+        Icon={AlertCircleIcon}
         iconColor="amber"
       />
     </div>

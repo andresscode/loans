@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
   analyzeLoan,
+  analyzeWeeklyCollection,
   calculateLoan,
   formatCOP,
   generatePaymentSchedule,
+  getWeekWindow,
   type LoanAnalysis,
   type LoanCalculation,
   type ScheduledPayment,
+  type WeeklyCollectionAnalysis,
 } from '@/lib/loan-math'
 
 function calcOrFail(
@@ -433,5 +436,182 @@ describe('analyzeLoan', () => {
     })
     expect(result.overdueCount).toBe(1)
     expect(result.overdueTotal).toBeCloseTo(amountPerPayment, 0)
+  })
+})
+
+describe('getWeekWindow', () => {
+  it('Wednesday → Mon 00:00 to Sun 23:59:59.999', () => {
+    const wed = new Date('2026-01-07T15:30:00')
+    const { start, end } = getWeekWindow(wed)
+    expect(start.getFullYear()).toBe(2026)
+    expect(start.getMonth()).toBe(0)
+    expect(start.getDate()).toBe(5) // Mon Jan 5
+    expect(start.getHours()).toBe(0)
+    expect(start.getMinutes()).toBe(0)
+    expect(end.getDate()).toBe(11) // Sun Jan 11
+    expect(end.getHours()).toBe(23)
+    expect(end.getMinutes()).toBe(59)
+    expect(end.getSeconds()).toBe(59)
+    expect(end.getMilliseconds()).toBe(999)
+  })
+
+  it('Monday is its own week start', () => {
+    const mon = new Date('2026-01-05T08:00:00')
+    const { start } = getWeekWindow(mon)
+    expect(start.getDate()).toBe(5)
+  })
+
+  it('Sunday → previous Monday (handles day===0 edge)', () => {
+    const sun = new Date('2026-01-11T20:00:00')
+    const { start, end } = getWeekWindow(sun)
+    expect(start.getDate()).toBe(5) // Mon Jan 5
+    expect(end.getDate()).toBe(11) // Sun Jan 11
+  })
+})
+
+function weeklyOrFail(
+  params: Parameters<typeof analyzeWeeklyCollection>[0],
+): WeeklyCollectionAnalysis {
+  const result = analyzeWeeklyCollection(params)
+  expect(result).not.toBeNull()
+  return result as WeeklyCollectionAnalysis
+}
+
+describe('analyzeWeeklyCollection', () => {
+  // Use local-time Date constructors (year, monthIndex, day) to avoid TZ shifts.
+  // Weekly loan: Jan 1 → Mar 1 (8 weekly payments, cuota = 150_000)
+  // generatePaymentSchedule adds 7 days to startDate via ms, so installments
+  // are at startDate + n*7 days local time.
+  // Schedule: Jan 8, 15, 22, 29, Feb 5, 12, 19, 26 (all local)
+  const weeklyBase = {
+    amount: 1_000_000,
+    interestRate: 10,
+    paymentFrequency: 'weekly' as const,
+    startDate: new Date(2026, 0, 1),
+    dueDate: new Date(2026, 2, 1),
+  }
+
+  it('weekly loan, full payment in selected week → status=paid', () => {
+    // Week of Mon Jan 5 – Sun Jan 11 contains the Jan 8 installment
+    const weekStart = new Date(2026, 0, 5)
+    const result = weeklyOrFail({
+      ...weeklyBase,
+      payments: [{ date: new Date(2026, 0, 9), amount: 150_000 }],
+      weekStart,
+      today: new Date(2026, 0, 9),
+    })
+    expect(result.isDueInWeek).toBe(true)
+    expect(result.cuota).toBe(150_000)
+    expect(result.paidThisWeek).toBe(150_000)
+    expect(result.status).toBe('paid')
+  })
+
+  it('weekly loan, partial payment → status=partial', () => {
+    const result = weeklyOrFail({
+      ...weeklyBase,
+      payments: [{ date: new Date(2026, 0, 9), amount: 50_000 }],
+      weekStart: new Date(2026, 0, 5),
+      today: new Date(2026, 0, 9),
+    })
+    expect(result.status).toBe('partial')
+    expect(result.paidThisWeek).toBe(50_000)
+  })
+
+  it('weekly loan, over-payment → status=overpaid', () => {
+    const result = weeklyOrFail({
+      ...weeklyBase,
+      payments: [{ date: new Date(2026, 0, 9), amount: 200_000 }],
+      weekStart: new Date(2026, 0, 5),
+      today: new Date(2026, 0, 9),
+    })
+    expect(result.status).toBe('overpaid')
+    expect(result.paidThisWeek).toBe(200_000)
+  })
+
+  it('weekly loan, no payment in current week → status=pending', () => {
+    const today = new Date(2026, 0, 7) // Wed of Jan 5–11
+    const result = weeklyOrFail({
+      ...weeklyBase,
+      payments: [],
+      weekStart: today,
+      today,
+    })
+    expect(result.status).toBe('pending')
+  })
+
+  it('weekly loan, no payment in past week → status=overdue', () => {
+    // Selected week is Jan 5–11 (past), today is Jan 20
+    const result = weeklyOrFail({
+      ...weeklyBase,
+      payments: [],
+      weekStart: new Date(2026, 0, 5),
+      today: new Date(2026, 0, 20),
+    })
+    expect(result.status).toBe('overdue')
+  })
+
+  it('biweekly loan, week with no scheduled installment → isDueInWeek=false, cuota=0', () => {
+    // Biweekly: Jan 1 → Feb 26 (4 payments: Jan 15, 29, Feb 12, 26)
+    // Week of Jan 5–11 has no scheduled installment
+    const biweeklyBase = {
+      ...weeklyBase,
+      paymentFrequency: 'biweekly' as const,
+      dueDate: new Date(2026, 1, 26),
+    }
+    const result = weeklyOrFail({
+      ...biweeklyBase,
+      payments: [],
+      weekStart: new Date(2026, 0, 5),
+      today: new Date(2026, 0, 7),
+    })
+    expect(result.isDueInWeek).toBe(false)
+    expect(result.cuota).toBe(0)
+  })
+
+  it('monthly loan, week with installment → isDueInWeek=true with monthly cuota', () => {
+    // Monthly Jan 1 → Jul 1 (6 payments: Feb 1, Mar 1, Apr 1, May 1, Jun 1, Jul 1)
+    // Feb 1 2026 is a Sunday → week of Mon Jan 26 – Sun Feb 1
+    const monthlyBase = {
+      amount: 1_000_000,
+      interestRate: 5,
+      paymentFrequency: 'monthly' as const,
+      startDate: new Date(2026, 0, 1),
+      dueDate: new Date(2026, 6, 1),
+    }
+    const expectedCuota = 1_300_000 / 6
+    const result = weeklyOrFail({
+      ...monthlyBase,
+      payments: [],
+      weekStart: new Date(2026, 0, 26),
+      today: new Date(2026, 0, 26),
+    })
+    expect(result.isDueInWeek).toBe(true)
+    expect(result.cuota).toBeCloseTo(expectedCuota, 5)
+  })
+
+  it('payments outside the week are ignored in paidThisWeek', () => {
+    const result = weeklyOrFail({
+      ...weeklyBase,
+      payments: [
+        { date: new Date(2026, 0, 12), amount: 500_000 }, // after week of Jan 5–11
+        { date: new Date(2026, 0, 9), amount: 150_000 }, // in week
+      ],
+      weekStart: new Date(2026, 0, 5),
+      today: new Date(2026, 0, 9),
+    })
+    // No prior scheduled installments and no prior payments → no carry
+    expect(result.paidThisWeek).toBe(150_000)
+    expect(result.status).toBe('paid')
+  })
+
+  it('returns null for invalid loan params', () => {
+    const result = analyzeWeeklyCollection({
+      ...weeklyBase,
+      amount: 0,
+      payments: [],
+      weekStart: new Date(2026, 0, 5),
+      today: new Date(2026, 0, 5),
+    })
+    expect(result).toBeNull()
   })
 })

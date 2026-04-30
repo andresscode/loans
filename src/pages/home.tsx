@@ -87,13 +87,9 @@ export function HomePage() {
                 if (!open) setFormError(null)
               }}
             >
-              <Button
-                variant="outline"
-                onClick={() => setDialogOpen(true)}
-                className="shadow-xs"
-              >
+              <Button variant="outline" onClick={() => setDialogOpen(true)}>
                 <PlusIcon />
-                Nuevo prestamo
+                Nuevo préstamo
               </Button>
               {dialogOpen && (
                 <LoanForm

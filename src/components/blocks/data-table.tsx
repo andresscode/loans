@@ -12,14 +12,14 @@ import {
   ArrowDownIcon,
   ArrowUpDownIcon,
   ArrowUpIcon,
-  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ChevronsLeftIcon,
   ChevronsRightIcon,
   Columns3Icon,
+  SearchIcon,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -27,6 +27,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -43,6 +44,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 type UseDataTableOptions<TData> = {
   data: TData[]
@@ -81,15 +87,31 @@ type DataTableColumnsMenuProps<TData> = {
 export function DataTableColumnsMenu<TData>({
   table,
 }: DataTableColumnsMenuProps<TData>) {
+  const [suppressTooltip, setSuppressTooltip] = useState(false)
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="shadow-xs">
-          <Columns3Icon />
-          Columnas
-          <ChevronDownIcon />
-        </Button>
-      </DropdownMenuTrigger>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (!open) setSuppressTooltip(true)
+      }}
+    >
+      <Tooltip open={suppressTooltip ? false : undefined}>
+        <DropdownMenuTrigger asChild>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Mostrar u ocultar columnas"
+              onPointerLeave={() => setSuppressTooltip(false)}
+              onBlur={() => setSuppressTooltip(false)}
+            >
+              <Columns3Icon />
+            </Button>
+          </TooltipTrigger>
+        </DropdownMenuTrigger>
+        <TooltipContent>
+          <p>Mostrar/ocultar columnas</p>
+        </TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" className="w-40">
         {table
           .getAllColumns()
@@ -118,6 +140,43 @@ type DataTableProps<TData> = {
   onPageChange: (page: number) => void
   onPageSizeChange: (size: number) => void
   onRowClick?: (row: TData) => void
+  searchValue?: string
+  onSearchChange?: (value: string) => void
+  searchPlaceholder?: string
+}
+
+function SearchInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+}) {
+  const [local, setLocal] = useState(value)
+
+  useEffect(() => {
+    setLocal(value)
+  }, [value])
+
+  useEffect(() => {
+    if (local === value) return
+    const handle = setTimeout(() => onChange(local), 250)
+    return () => clearTimeout(handle)
+  }, [local, value, onChange])
+
+  return (
+    <div className="relative max-w-xs">
+      <SearchIcon className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        value={local}
+        onChange={(e) => setLocal(e.target.value)}
+        placeholder={placeholder}
+        className="pl-8"
+      />
+    </div>
+  )
 }
 
 export function DataTable<TData>({
@@ -128,12 +187,22 @@ export function DataTable<TData>({
   onPageChange,
   onPageSizeChange,
   onRowClick,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder = 'Buscar...',
 }: DataTableProps<TData>) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const visibleColumnCount = table.getVisibleLeafColumns().length
 
   return (
     <div className="space-y-3">
+      {onSearchChange && (
+        <SearchInput
+          value={searchValue ?? ''}
+          onChange={onSearchChange}
+          placeholder={searchPlaceholder}
+        />
+      )}
       {/* Table */}
       <div className="overflow-hidden rounded-lg border">
         <Table>

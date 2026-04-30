@@ -31,12 +31,20 @@ type Props = {
   details?: Detail[]
   progressText?: string
   progressValue?: number
+  progressTone?: 'default' | 'over'
 }
 
-function ProgressRing({ value }: { value: number }) {
+function ProgressRing({
+  value,
+  tone = 'default',
+}: {
+  value: number
+  tone?: 'default' | 'over'
+}) {
   const clamped = Math.max(0, Math.min(100, value))
   const radius = 9
   const circumference = 2 * Math.PI * radius
+  const strokeClass = tone === 'over' ? 'stroke-blue-500' : 'stroke-emerald-500'
   return (
     <svg
       viewBox="0 0 24 24"
@@ -60,7 +68,7 @@ function ProgressRing({ value }: { value: number }) {
         strokeWidth="6"
         strokeDasharray={circumference}
         strokeDashoffset={circumference * (1 - clamped / 100)}
-        className="stroke-emerald-500"
+        className={strokeClass}
       />
     </svg>
   )
@@ -71,6 +79,7 @@ export function AmountCell({
   details,
   progressText,
   progressValue,
+  progressTone = 'default',
 }: Props) {
   return (
     <div className="py-1">
@@ -98,7 +107,7 @@ export function AmountCell({
           {progressText && (
             <span className="flex items-center gap-1 text-muted-foreground">
               {progressValue !== undefined && (
-                <ProgressRing value={progressValue} />
+                <ProgressRing value={progressValue} tone={progressTone} />
               )}
               <span className="tabular-nums">{progressText}</span>
             </span>

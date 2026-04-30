@@ -108,6 +108,114 @@ export function generatePaymentSchedule(params: {
   return schedule
 }
 
+// Returns Monday 00:00:00.000 → Sunday 23:59:59.999 around the given date.
+export function getWeekWindow(date: Date): { start: Date; end: Date } {
+  const day = date.getDay()
+  const mondayOffset = day === 0 ? -6 : 1 - day
+  const start = new Date(date)
+  start.setHours(0, 0, 0, 0)
+  start.setDate(start.getDate() + mondayOffset)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 6)
+  end.setHours(23, 59, 59, 999)
+  return { start, end }
+}
+
+export type WeeklyStatus =
+  | 'paid'
+  | 'partial'
+  | 'overpaid'
+  | 'pending'
+  | 'overdue'
+
+export type WeeklyCollectionAnalysis = {
+  isDueInWeek: boolean
+  scheduledCuota: number
+  mora: number
+  aFavor: number
+  cuota: number
+  paidThisWeek: number
+  status: WeeklyStatus
+  weekStart: Date
+  weekEnd: Date
+}
+
+export function analyzeWeeklyCollection<
+  P extends { date: Date; amount: number },
+>(params: {
+  amount: number
+  interestRate: number
+  paymentFrequency: 'weekly' | 'biweekly' | 'monthly'
+  startDate: Date
+  dueDate: Date
+  payments: P[]
+  weekStart: Date
+  today: Date
+}): WeeklyCollectionAnalysis | null {
+  const { payments, weekStart, today } = params
+
+  const schedule = generatePaymentSchedule({
+    amount: params.amount,
+    interestRate: params.interestRate,
+    paymentFrequency: params.paymentFrequency,
+    startDate: params.startDate,
+    dueDate: params.dueDate,
+  })
+  if (!schedule) return null
+
+  const { start, end } = getWeekWindow(weekStart)
+
+  const installmentsInWeek = schedule.filter(
+    (p) => p.date >= start && p.date <= end,
+  )
+  const scheduledCuota = installmentsInWeek.reduce(
+    (sum, p) => sum + p.amount,
+    0,
+  )
+  const isDueInWeek = installmentsInWeek.length > 0
+
+  const priorScheduled = schedule
+    .filter((p) => p.date < start)
+    .reduce((sum, p) => sum + p.amount, 0)
+  const priorPaid = payments
+    .filter((p) => p.date < start)
+    .reduce((sum, p) => sum + p.amount, 0)
+  const carry = priorScheduled - priorPaid
+  const mora = Math.max(0, carry)
+  const aFavor = Math.max(0, -carry)
+  const cuota = Math.max(0, scheduledCuota + carry)
+
+  const paidThisWeek = payments
+    .filter((p) => p.date >= start && p.date <= end)
+    .reduce((sum, p) => sum + p.amount, 0)
+
+  const { start: currentWeekStart } = getWeekWindow(today)
+  const isPastWeek = end < currentWeekStart
+
+  let status: WeeklyStatus
+  if (paidThisWeek === 0) {
+    status = isPastWeek ? 'overdue' : 'pending'
+  } else if (paidThisWeek < cuota) {
+    status = 'partial'
+  } else if (paidThisWeek === cuota) {
+    status = 'paid'
+  } else {
+    status = 'overpaid'
+  }
+
+  return {
+    isDueInWeek,
+    scheduledCuota,
+    mora,
+    aFavor,
+    cuota,
+    paidThisWeek,
+    status,
+    weekStart: start,
+    weekEnd: end,
+  }
+}
+
 export type LoanAnalysis = {
   totalToRepay: number
   totalPaid: number
@@ -172,15 +280,7 @@ export function analyzeLoan(params: {
     expectedInstallments * amountPerPayment - totalPaid,
   )
 
-  // Check if any scheduled payment falls in the current Mon–Sun week
-  const todayDay = today.getDay()
-  const mondayOffset = todayDay === 0 ? -6 : 1 - todayDay
-  const monday = new Date(today)
-  monday.setHours(0, 0, 0, 0)
-  monday.setDate(monday.getDate() + mondayOffset)
-  const sunday = new Date(monday)
-  sunday.setDate(sunday.getDate() + 6)
-  sunday.setHours(23, 59, 59, 999)
+  const { start: monday, end: sunday } = getWeekWindow(today)
 
   const isDueThisWeek = schedule.some(
     (p) => p.date >= monday && p.date <= sunday,

@@ -63,6 +63,11 @@ export type CreatePaymentInput = {
   paymentDate: string
 }
 
+export type UpdatePaymentInput = {
+  amount?: number
+  paymentDate?: string
+}
+
 export type PaginatedResult<T> = {
   data: T[]
   total: number
@@ -77,6 +82,11 @@ export type TabQueryParams = {
   page: number
   pageSize: number
   sorting: SortingParam
+  search?: string
+}
+
+export type WeeklyQueryParams = TabQueryParams & {
+  weekStart: string // ISO date YYYY-MM-DD (Monday of selected week)
 }
 
 // Tab 1: Activos — all non-fully-paid loans
@@ -116,6 +126,43 @@ export type OverdueLoanRow = {
   amount: number
 }
 
+// Weekly collection — one row per loan installment scheduled in selected week
+export type WeeklyStatus =
+  | 'paid'
+  | 'partial'
+  | 'overpaid'
+  | 'pending'
+  | 'overdue'
+
+export type WeeklyCollectionRow = {
+  id: number
+  borrowerId: number
+  borrowerName: string
+  cuota: number
+  scheduledCuota: number
+  mora: number
+  aFavor: number
+  paidThisWeek: number
+  status: WeeklyStatus
+  amount: number
+  paymentFrequency: PaymentFrequency
+  lastPaymentId: number | null
+  lastPaymentAmount: number | null
+  lastPaymentDate: string | null
+}
+
+export type WeeklyCollectionSummary = {
+  weekStart: string
+  weekEnd: string
+  isPastWeek: boolean
+  isCurrentWeek: boolean
+  expected: number
+  collected: number
+  remaining: number
+  borrowerCount: number
+  paidCount: number
+}
+
 // Tab 4: Pagados — fully paid loans
 export type PaidLoanRow = {
   id: number
@@ -142,9 +189,20 @@ export type LoansApi = {
     params: TabQueryParams,
   ) => Promise<PaginatedResult<OverdueLoanRow>>
   getPaid: (params: TabQueryParams) => Promise<PaginatedResult<PaidLoanRow>>
+  getWeeklyCollection: (
+    params: WeeklyQueryParams,
+  ) => Promise<PaginatedResult<WeeklyCollectionRow>>
+  getWeeklySummary: (params: {
+    weekStart: string
+    search?: string
+  }) => Promise<WeeklyCollectionSummary>
   searchBorrowers: (query: string) => Promise<Borrower[]>
   getPayments: (loanId: number) => Promise<Payment[]>
   createPayment: (data: CreatePaymentInput) => Promise<ActionResult<Payment>>
+  updatePayment: (
+    id: number,
+    data: UpdatePaymentInput,
+  ) => Promise<ActionResult<Payment>>
   deletePayment: (id: number) => Promise<ActionResult>
 }
 

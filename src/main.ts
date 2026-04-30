@@ -16,12 +16,18 @@ import {
 import {
   createPayment,
   deletePayment,
+  getAllPayments,
   getPaymentsByLoanId,
+  updatePayment,
 } from './database/payments'
 import { seedDatabase } from './database/seed'
 import { createSession, validateSession } from './database/sessions'
 import { authenticateUser, createUser, getUserCount } from './database/users'
 import { analyzeLoan } from './lib/loan-math'
+import {
+  buildWeeklyCollection,
+  type WeeklyCollectionInput,
+} from './lib/weekly-collection'
 import type {
   ActiveLoanRow,
   ActiveLoansSummary,
@@ -31,6 +37,7 @@ import type {
   PaymentFrequency,
   SortingParam,
   TabQueryParams,
+  WeeklyQueryParams,
 } from './types'
 
 function toUser(row: {
@@ -309,6 +316,31 @@ function registerIpcHandlers() {
     },
   )
 
+  ipcMain.handle(
+    'loans:update-payment',
+    (_event, id: number, data: { amount?: number; paymentDate?: string }) => {
+      try {
+        const row = updatePayment(id, data)
+        if (!row) {
+          return { success: false, error: 'El pago no existe' }
+        }
+        return {
+          success: true,
+          data: {
+            id: row.id,
+            loanId: row.loan_id,
+            amount: row.amount,
+            paymentDate: row.payment_date,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          },
+        }
+      } catch {
+        return { success: false, error: 'Error al actualizar el pago' }
+      }
+    },
+  )
+
   ipcMain.handle('loans:delete-payment', (_event, id: number) => {
     try {
       const deleted = deletePayment(id)
@@ -335,20 +367,60 @@ function registerIpcHandlers() {
     })
   }
 
-  function paginate<T>(
+  function paginate<T extends { borrowerName?: string }>(
     arr: T[],
     params: TabQueryParams,
     defaultSort: { column: string; direction: 'asc' | 'desc' },
   ) {
+    const filtered = params.search
+      ? arr.filter((row) =>
+          (row.borrowerName ?? '')
+            .toLowerCase()
+            .includes((params.search as string).toLowerCase()),
+        )
+      : arr
     const sorting: SortingParam = params.sorting ?? defaultSort
-    const sorted = sortBy(arr, sorting.column, sorting.direction)
+    const sorted = sortBy(filtered, sorting.column, sorting.direction)
     const start = (params.page - 1) * params.pageSize
     return {
       data: sorted.slice(start, start + params.pageSize),
-      total: arr.length,
+      total: filtered.length,
       page: params.page,
       pageSize: params.pageSize,
     }
+  }
+
+  function buildWeeklyInputs(): WeeklyCollectionInput[] {
+    const all = analyzeAllLoans()
+    const allPayments = getAllPayments()
+    const paymentsByLoan = new Map<
+      number,
+      { id: number; date: Date; amount: number }[]
+    >()
+    for (const p of allPayments) {
+      const arr = paymentsByLoan.get(p.loan_id) ?? []
+      arr.push({
+        id: p.id,
+        date: parseLocalDate(p.payment_date),
+        amount: p.amount,
+      })
+      paymentsByLoan.set(p.loan_id, arr)
+    }
+    return all
+      .filter(({ analysis }) => !analysis.isFullyPaid)
+      .map(({ row }) => ({
+        loan: {
+          id: row.id,
+          borrowerId: row.borrower_id,
+          borrowerName: row.borrower_name,
+          amount: row.amount,
+          interestRate: row.interest_rate,
+          paymentFrequency: row.payment_frequency as PaymentFrequency,
+          startDate: parseLocalDate(row.start_date),
+          dueDate: parseLocalDate(row.due_date),
+        },
+        payments: paymentsByLoan.get(row.id) ?? [],
+      }))
   }
 
   function analyzeAllLoans() {
@@ -452,6 +524,41 @@ function registerIpcHandlers() {
       direction: 'desc',
     })
   })
+
+  ipcMain.handle(
+    'loans:get-weekly-collection',
+    (_event, params: WeeklyQueryParams) => {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const inputs = buildWeeklyInputs()
+      const { rows } = buildWeeklyCollection({
+        inputs,
+        weekStart: parseLocalDate(params.weekStart),
+        today,
+        search: params.search,
+      })
+      return paginate(rows, params, {
+        column: 'borrowerName',
+        direction: 'asc',
+      })
+    },
+  )
+
+  ipcMain.handle(
+    'loans:get-weekly-summary',
+    (_event, params: { weekStart: string; search?: string }) => {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const inputs = buildWeeklyInputs()
+      const { summary } = buildWeeklyCollection({
+        inputs,
+        weekStart: parseLocalDate(params.weekStart),
+        today,
+        search: params.search,
+      })
+      return summary
+    },
+  )
 
   ipcMain.handle('loans:get-paid', (_event, params: TabQueryParams) => {
     const all = analyzeAllLoans()

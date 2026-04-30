@@ -1,5 +1,8 @@
 import type { ColumnDef, SortingState, Updater } from '@tanstack/react-table'
 import {
+  CalendarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   EllipsisVerticalIcon,
   EyeIcon,
   PencilIcon,
@@ -33,28 +36,39 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { parseLocalDate } from '@/lib/utils'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { formatLocalDate, parseLocalDate } from '@/lib/utils'
 import { loansService } from '@/services/loans'
 import type {
   ActiveLoanRow,
   ActiveLoansSummary,
-  DueLoanRow,
   LoanWithBorrower,
   OverdueLoanRow,
   PaidLoanRow,
   SortingParam,
   UpdateLoanInput,
+  WeeklyCollectionRow,
 } from '@/types'
 import { ActiveLoansSummaryCards } from './active-loans-summary'
 import { AmountCell } from './amount-cell'
 import { BorrowerCell } from './borrower-cell'
-
-const frequencyLabels: Record<string, string> = {
-  weekly: 'Semanal',
-  biweekly: 'Quincenal',
-  monthly: 'Mensual',
-}
+import { ExpandableSearch } from './expandable-search'
+import { RegisterPaymentDialog } from './register-payment-dialog'
+import { WeeklyCollectionSummaryCards } from './weekly-collection-summary'
+import {
+  makeWeeklyCollectionColumns,
+  useWeeklyCollectionData,
+} from './weekly-collection-tab'
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('es-CO', {
@@ -76,6 +90,122 @@ function formatDate(dateStr: string): string {
 function toSortingParam(sorting: SortingState): SortingParam {
   if (sorting.length === 0) return null
   return { column: sorting[0].id, direction: sorting[0].desc ? 'desc' : 'asc' }
+}
+
+// --- Week helpers ---
+
+function getCurrentWeekMonday(date = new Date()): Date {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  const day = d.getDay()
+  const offset = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + offset)
+  return d
+}
+
+function shiftWeek(date: Date, weeks: number): Date {
+  const d = new Date(date)
+  d.setDate(d.getDate() + weeks * 7)
+  return d
+}
+
+const monthShort = new Intl.DateTimeFormat('es-MX', {
+  day: '2-digit',
+  month: 'short',
+})
+
+const monthLong = new Intl.DateTimeFormat('es-MX', {
+  month: 'long',
+  year: 'numeric',
+})
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+function formatWeekRange(monday: Date): string {
+  const sunday = new Date(monday)
+  sunday.setDate(sunday.getDate() + 6)
+  const sameMonth = monday.getMonth() === sunday.getMonth()
+  if (sameMonth) {
+    return `${monday.getDate()} – ${monthShort.format(sunday)}`
+  }
+  return `${monthShort.format(monday)} – ${monthShort.format(sunday)}`
+}
+
+function WeekPopover({
+  weekStart,
+  onChange,
+}: {
+  weekStart: Date
+  onChange: (d: Date) => void
+}) {
+  const isToday =
+    formatLocalDate(weekStart) === formatLocalDate(getCurrentWeekMonday())
+  const sunday = new Date(weekStart)
+  sunday.setDate(sunday.getDate() + 6)
+  return (
+    <Popover>
+      <Tooltip>
+        <PopoverTrigger asChild>
+          <TooltipTrigger asChild>
+            <Button variant="outline" size="icon" aria-label="Cambiar semana">
+              <CalendarIcon />
+            </Button>
+          </TooltipTrigger>
+        </PopoverTrigger>
+        <TooltipContent>
+          <p>Cambiar semana</p>
+        </TooltipContent>
+      </Tooltip>
+      <PopoverContent align="end" className="w-64 p-4">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onChange(shiftWeek(weekStart, -1))}
+              aria-label="Semana anterior"
+            >
+              <ChevronLeftIcon />
+            </Button>
+            <span className="font-medium text-sm">
+              {capitalize(monthLong.format(weekStart))}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onChange(shiftWeek(weekStart, 1))}
+              aria-label="Semana siguiente"
+            >
+              <ChevronRightIcon />
+            </Button>
+          </div>
+          <div className="flex flex-col items-center gap-1 rounded-lg border bg-muted/40 px-3 py-4">
+            <span className="text-muted-foreground text-xs uppercase tracking-wide">
+              Semana
+            </span>
+            <span className="font-semibold text-foreground text-xl tabular-nums">
+              {formatWeekRange(weekStart)}
+            </span>
+            <span className="text-muted-foreground text-xs tabular-nums">
+              Lun – Dom
+            </span>
+          </div>
+          <Button
+            variant={isToday ? 'outline' : 'default'}
+            size="sm"
+            onClick={() => onChange(getCurrentWeekMonday())}
+            disabled={isToday}
+            className="w-full gap-1.5"
+          >
+            <CalendarIcon className="size-3.5" />
+            {isToday ? 'Semana actual' : 'Ir a hoy'}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 // --- Column definitions ---
@@ -115,58 +245,6 @@ const activeColumns: ColumnDef<ActiveLoanRow, unknown>[] = [
         progressValue={row.original.progress}
         progressText={`${Math.round(row.original.progress)}% pagado`}
       />
-    ),
-  },
-]
-
-const dueColumns: ColumnDef<DueLoanRow, unknown>[] = [
-  { accessorKey: 'borrowerName', header: 'Prestatario', enableSorting: true },
-  {
-    accessorKey: 'currentPaymentAmount',
-    header: 'Cuota actual',
-    enableSorting: true,
-    cell: ({ row }) => (
-      <span className="tabular-nums">
-        {formatCurrency(row.original.currentPaymentAmount)}
-      </span>
-    ),
-  },
-  {
-    accessorKey: 'overduePaymentsTotal',
-    header: 'Cuotas vencidas',
-    enableSorting: true,
-    cell: ({ row }) => (
-      <span className="tabular-nums">
-        {formatCurrency(row.original.overduePaymentsTotal)}
-      </span>
-    ),
-  },
-  {
-    accessorKey: 'totalDue',
-    header: 'Total a cobrar',
-    enableSorting: true,
-    cell: ({ row }) => (
-      <span className="font-medium tabular-nums">
-        {formatCurrency(row.original.totalDue)}
-      </span>
-    ),
-  },
-  {
-    accessorKey: 'paymentFrequency',
-    header: 'Frecuencia',
-    enableSorting: false,
-    cell: ({ row }) =>
-      frequencyLabels[row.original.paymentFrequency] ??
-      row.original.paymentFrequency,
-  },
-  {
-    accessorKey: 'amount',
-    header: 'Monto del prestamo',
-    enableSorting: true,
-    cell: ({ row }) => (
-      <span className="tabular-nums">
-        {formatCurrency(row.original.amount)}
-      </span>
     ),
   },
 ]
@@ -337,15 +415,17 @@ function useTabData<T>(
     page: number
     pageSize: number
     sorting: SortingParam
+    search?: string
   }) => Promise<{ data: T[]; total: number; page: number; pageSize: number }>,
   refreshToken: number,
 ) {
-  const [state, setState] = useState<TabState<T>>({
+  const [state, setState] = useState<TabState<T> & { search: string }>({
     data: [],
     total: 0,
     page: 1,
     pageSize: 10,
     sorting: [],
+    search: '',
   })
   const [, forceRefresh] = useReducer((x: number) => x + 1, 0)
 
@@ -354,13 +434,14 @@ function useTabData<T>(
       page: state.page,
       pageSize: state.pageSize,
       sorting: toSortingParam(state.sorting),
+      search: state.search || undefined,
     })
     setState((prev) => ({
       ...prev,
       data: result.data,
       total: result.total,
     }))
-  }, [fetcher, state.page, state.pageSize, state.sorting])
+  }, [fetcher, state.page, state.pageSize, state.sorting, state.search])
 
   useEffect(() => {
     void refreshToken
@@ -379,6 +460,8 @@ function useTabData<T>(
         sorting:
           typeof updater === 'function' ? updater(prev.sorting) : updater,
       })),
+    setSearch: (search: string) =>
+      setState((prev) => ({ ...prev, search, page: 1 })),
     refresh: forceRefresh,
   }
 }
@@ -423,12 +506,28 @@ export function LoansTable({
       .then(setActiveSummary)
       .catch((err) => console.error('getActiveSummary failed', err))
   }, [refreshToken])
-  const due = useTabData<DueLoanRow>(loansService.getDue, refreshToken)
   const overdue = useTabData<OverdueLoanRow>(
     loansService.getOverdue,
     refreshToken,
   )
   const paid = useTabData<PaidLoanRow>(loansService.getPaid, refreshToken)
+
+  // Lifted Por cobrar state
+  const [weekStart, setWeekStart] = useState<Date>(() => getCurrentWeekMonday())
+  const [dueSearch, setDueSearch] = useState('')
+  const [duePage, setDuePage] = useState(1)
+  const [duePageSize, setDuePageSize] = useState(10)
+  const [dueSorting, setDueSorting] = useState<SortingState>([])
+  const [paymentTarget, setPaymentTarget] =
+    useState<WeeklyCollectionRow | null>(null)
+  const due = useWeeklyCollectionData({
+    weekStart,
+    search: dueSearch,
+    page: duePage,
+    pageSize: duePageSize,
+    sorting: dueSorting,
+    refreshToken,
+  })
 
   // When a row is clicked, build a LoanWithBorrower for the detail dialog
   function handleViewActive(row: ActiveLoanRow) {
@@ -447,12 +546,8 @@ export function LoansTable({
   }
 
   function handleViewById(id: number, _borrowerName: string) {
-    // For non-active tabs, we just set the ID to open the detail
     setSelectedLoanId(id)
-    // We need to fetch the full loan data; for now use getAll as fallback
-    // The LoanDetail component fetches payments itself, so we build a minimal object
     setSelectedLoan(null)
-    // Fetch the loan details
     loansService.getAll(1, 1000).then((result) => {
       const loan = result.data.find((l) => l.id === id)
       if (loan) {
@@ -507,13 +602,6 @@ export function LoansTable({
     }),
   ]
 
-  const dueColumnsWithActions = [
-    ...dueColumns,
-    makeActionsColumn<DueLoanRow>({
-      onView: (row) => handleViewById(row.id, row.borrowerName),
-    }),
-  ]
-
   const overdueColumnsWithActions = [
     ...overdueColumns,
     makeActionsColumn<OverdueLoanRow>({
@@ -535,13 +623,6 @@ export function LoansTable({
     sorting: active.sorting,
     onSortingChange: active.setSorting,
   })
-  const dueTable = useDataTable({
-    data: due.data,
-    columns: dueColumnsWithActions,
-    total: due.total,
-    sorting: due.sorting,
-    onSortingChange: due.setSorting,
-  })
   const overdueTable = useDataTable({
     data: overdue.data,
     columns: overdueColumnsWithActions,
@@ -556,21 +637,48 @@ export function LoansTable({
     sorting: paid.sorting,
     onSortingChange: paid.setSorting,
   })
+  const dueColumns = makeWeeklyCollectionColumns({
+    onRegisterPayment: setPaymentTarget,
+    onView: handleViewById,
+  })
+  const dueTable = useDataTable({
+    data: due.rows,
+    columns: dueColumns,
+    total: due.total,
+    sorting: dueSorting,
+    onSortingChange: setDueSorting,
+  })
 
   // biome-ignore lint/suspicious/noExplicitAny: ColumnsMenu only reads column metadata, so TData doesn't matter at this site.
-  const tablesByTab: Record<TabKey, ReturnType<typeof useDataTable<any>>> = {
+  type AnyTable = ReturnType<typeof useDataTable<any>>
+  const tablesByTab: Record<TabKey, AnyTable> = {
     active: activeTable,
     due: dueTable,
     overdue: overdueTable,
     paid: paidTable,
   }
 
+  // Search wiring per tab
+  const searchValueByTab: Record<TabKey, string> = {
+    active: active.search,
+    due: dueSearch,
+    overdue: overdue.search,
+    paid: paid.search,
+  }
+  const setSearchByTab: Record<TabKey, (v: string) => void> = {
+    active: active.setSearch,
+    due: (v) => {
+      setDueSearch(v)
+      setDuePage(1)
+    },
+    overdue: overdue.setSearch,
+    paid: paid.setSearch,
+  }
+
+  const currentTable = tablesByTab[activeTab]
+
   return (
     <div>
-      {activeTab === 'active' && (
-        <ActiveLoansSummaryCards summary={activeSummary} />
-      )}
-
       <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as TabKey)}
@@ -578,7 +686,7 @@ export function LoansTable({
         <div className="my-4 flex items-center justify-between gap-2">
           <TabsList>
             <TabsTrigger value="active">
-              Activos
+              Préstamos
               {active.total > 0 && (
                 <span className="ml-1 rounded-full bg-primary/10 px-1.5 text-primary text-xs tabular-nums">
                   {active.total}
@@ -611,33 +719,50 @@ export function LoansTable({
             </TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
-            <DataTableColumnsMenu table={tablesByTab[activeTab]} />
+            {activeTab === 'due' && (
+              <WeekPopover weekStart={weekStart} onChange={setWeekStart} />
+            )}
+            <ExpandableSearch
+              value={searchValueByTab[activeTab]}
+              onChange={setSearchByTab[activeTab]}
+              placeholder="Buscar deudor..."
+            />
+            <DataTableColumnsMenu table={currentTable} />
             {toolbarActions}
           </div>
         </div>
 
         <TabsContent value="active">
-          <DataTable
-            table={activeTable}
-            page={active.page}
-            pageSize={active.pageSize}
-            total={active.total}
-            onPageChange={active.setPage}
-            onPageSizeChange={active.setPageSize}
-            onRowClick={handleViewActive}
-          />
+          <ActiveLoansSummaryCards summary={activeSummary} />
+          <div className="mt-4">
+            <DataTable
+              table={activeTable}
+              page={active.page}
+              pageSize={active.pageSize}
+              total={active.total}
+              onPageChange={active.setPage}
+              onPageSizeChange={active.setPageSize}
+              onRowClick={handleViewActive}
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="due">
-          <DataTable
-            table={dueTable}
-            page={due.page}
-            pageSize={due.pageSize}
-            total={due.total}
-            onPageChange={due.setPage}
-            onPageSizeChange={due.setPageSize}
-            onRowClick={(row) => handleViewById(row.id, row.borrowerName)}
-          />
+          <WeeklyCollectionSummaryCards summary={due.summary} />
+          <div className="mt-4">
+            <DataTable
+              table={dueTable}
+              page={duePage}
+              pageSize={duePageSize}
+              total={due.total}
+              onPageChange={setDuePage}
+              onPageSizeChange={(s) => {
+                setDuePageSize(s)
+                setDuePage(1)
+              }}
+              onRowClick={(row) => handleViewById(row.id, row.borrowerName)}
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="overdue">
@@ -664,6 +789,18 @@ export function LoansTable({
           />
         </TabsContent>
       </Tabs>
+
+      {paymentTarget && (
+        <RegisterPaymentDialog
+          row={paymentTarget}
+          weekStart={weekStart}
+          onClose={() => setPaymentTarget(null)}
+          onSuccess={() => {
+            setPaymentTarget(null)
+            handlePaymentChange()
+          }}
+        />
+      )}
 
       {/* Edit Dialog */}
       <Dialog

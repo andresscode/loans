@@ -39,23 +39,36 @@ contextBridge.exposeInMainWorld('api', {
       page: number
       pageSize: number
       sorting: { column: string; direction: 'asc' | 'desc' } | null
+      search?: string
     }) => ipcRenderer.invoke('loans:get-active', params),
     getActiveSummary: () => ipcRenderer.invoke('loans:get-active-summary'),
     getDue: (params: {
       page: number
       pageSize: number
       sorting: { column: string; direction: 'asc' | 'desc' } | null
+      search?: string
     }) => ipcRenderer.invoke('loans:get-due', params),
     getOverdue: (params: {
       page: number
       pageSize: number
       sorting: { column: string; direction: 'asc' | 'desc' } | null
+      search?: string
     }) => ipcRenderer.invoke('loans:get-overdue', params),
     getPaid: (params: {
       page: number
       pageSize: number
       sorting: { column: string; direction: 'asc' | 'desc' } | null
+      search?: string
     }) => ipcRenderer.invoke('loans:get-paid', params),
+    getWeeklyCollection: (params: {
+      page: number
+      pageSize: number
+      sorting: { column: string; direction: 'asc' | 'desc' } | null
+      search?: string
+      weekStart: string
+    }) => ipcRenderer.invoke('loans:get-weekly-collection', params),
+    getWeeklySummary: (params: { weekStart: string; search?: string }) =>
+      ipcRenderer.invoke('loans:get-weekly-summary', params),
     searchBorrowers: (query: string) =>
       ipcRenderer.invoke('loans:search-borrowers', query),
     getPayments: (loanId: number) =>
@@ -65,6 +78,10 @@ contextBridge.exposeInMainWorld('api', {
       amount: number
       paymentDate: string
     }) => ipcRenderer.invoke('loans:create-payment', data),
+    updatePayment: (
+      id: number,
+      data: { amount?: number; paymentDate?: string },
+    ) => ipcRenderer.invoke('loans:update-payment', id, data),
     deletePayment: (id: number) =>
       ipcRenderer.invoke('loans:delete-payment', id),
   },

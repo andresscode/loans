@@ -43,6 +43,12 @@ export function getPaymentsByLoanId(loanId: number): PaymentRow[] {
     .all(loanId) as PaymentRow[]
 }
 
+export function getAllPayments(): PaymentRow[] {
+  return getDb()
+    .prepare('SELECT * FROM payments ORDER BY payment_date ASC')
+    .all() as PaymentRow[]
+}
+
 export function updatePayment(
   id: number,
   data: {

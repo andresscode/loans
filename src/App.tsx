@@ -3,6 +3,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router'
 import { AuthProvider, useAuth } from '@/contexts/auth-context'
 import { HomePage } from '@/pages/home'
 import { LoginPage } from '@/pages/login'
+import { TooltipProvider } from './components/ui/tooltip'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -25,17 +26,19 @@ export default function App() {
   return (
     <HashRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
+        <TooltipProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <HomePage />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </TooltipProvider>
       </AuthProvider>
     </HashRouter>
   )
