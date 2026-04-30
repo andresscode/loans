@@ -658,7 +658,7 @@ export function LoansTable({
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as TabKey)}
       >
-        <div className="my-4 flex items-center justify-between gap-2">
+        <div className="my-2 flex items-center justify-between gap-2">
           <TabsList>
             <TabsTrigger value="active">
               Préstamos
