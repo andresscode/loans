@@ -1,6 +1,6 @@
 import type { ColumnDef, SortingState, Updater } from '@tanstack/react-table'
 import {
-  CalendarIcon,
+  CalendarDaysIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   EllipsisVerticalIcon,
@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { ButtonGroup, ButtonGroupText } from '@/components/ui/button-group'
 import { Dialog } from '@/components/ui/dialog'
 import {
   DropdownMenu,
@@ -36,11 +37,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Tooltip,
@@ -109,102 +105,80 @@ function shiftWeek(date: Date, weeks: number): Date {
   return d
 }
 
-const monthShort = new Intl.DateTimeFormat('es-MX', {
-  day: '2-digit',
-  month: 'short',
-})
-
-const monthLong = new Intl.DateTimeFormat('es-MX', {
-  month: 'long',
-  year: 'numeric',
-})
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
+function formatShortDate(date: Date): string {
+  const dd = String(date.getDate()).padStart(2, '0')
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const yy = String(date.getFullYear()).slice(-2)
+  return `${dd}/${mm}/${yy}`
 }
 
-function formatWeekRange(monday: Date): string {
+function formatWeekRangeShort(monday: Date): string {
   const sunday = new Date(monday)
   sunday.setDate(sunday.getDate() + 6)
-  const sameMonth = monday.getMonth() === sunday.getMonth()
-  if (sameMonth) {
-    return `${monday.getDate()} – ${monthShort.format(sunday)}`
-  }
-  return `${monthShort.format(monday)} – ${monthShort.format(sunday)}`
+  return `${formatShortDate(monday)} - ${formatShortDate(sunday)}`
 }
 
-function WeekPopover({
+function WeekNavigator({
   weekStart,
   onChange,
+  showLabel,
 }: {
   weekStart: Date
   onChange: (d: Date) => void
+  showLabel: boolean
 }) {
-  const isToday =
+  const isCurrent =
     formatLocalDate(weekStart) === formatLocalDate(getCurrentWeekMonday())
-  const sunday = new Date(weekStart)
-  sunday.setDate(sunday.getDate() + 6)
   return (
-    <Popover>
+    <ButtonGroup>
       <Tooltip>
-        <PopoverTrigger asChild>
-          <TooltipTrigger asChild>
-            <Button variant="outline" size="icon" aria-label="Cambiar semana">
-              <CalendarIcon />
-            </Button>
-          </TooltipTrigger>
-        </PopoverTrigger>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onChange(getCurrentWeekMonday())}
+            disabled={isCurrent}
+            aria-label="Volver a la semana actual"
+          >
+            <CalendarDaysIcon />
+          </Button>
+        </TooltipTrigger>
         <TooltipContent>
-          <p>Cambiar semana</p>
+          {isCurrent ? 'Estás en la semana actual' : 'Volver a hoy'}
         </TooltipContent>
       </Tooltip>
-      <PopoverContent align="end" className="w-64 p-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onChange(shiftWeek(weekStart, -1))}
-              aria-label="Semana anterior"
-            >
-              <ChevronLeftIcon />
-            </Button>
-            <span className="font-medium text-sm">
-              {capitalize(monthLong.format(weekStart))}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onChange(shiftWeek(weekStart, 1))}
-              aria-label="Semana siguiente"
-            >
-              <ChevronRightIcon />
-            </Button>
-          </div>
-          <div className="flex flex-col items-center gap-1 rounded-lg border bg-muted/40 px-3 py-4">
-            <span className="text-muted-foreground text-xs uppercase tracking-wide">
-              Semana
-            </span>
-            <span className="font-semibold text-foreground text-xl tabular-nums">
-              {formatWeekRange(weekStart)}
-            </span>
-            <span className="text-muted-foreground text-xs tabular-nums">
-              Lun – Dom
-            </span>
-          </div>
+      {showLabel && (
+        <ButtonGroupText className="tabular-nums">
+          {formatWeekRangeShort(weekStart)}
+        </ButtonGroupText>
+      )}
+      <Tooltip>
+        <TooltipTrigger asChild>
           <Button
-            variant={isToday ? 'outline' : 'default'}
-            size="sm"
-            onClick={() => onChange(getCurrentWeekMonday())}
-            disabled={isToday}
-            className="w-full gap-1.5"
+            variant="outline"
+            size="icon"
+            onClick={() => onChange(shiftWeek(weekStart, -1))}
+            aria-label="Semana anterior"
           >
-            <CalendarIcon className="size-3.5" />
-            {isToday ? 'Semana actual' : 'Ir a hoy'}
+            <ChevronLeftIcon />
           </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
+        </TooltipTrigger>
+        <TooltipContent>Semana anterior</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onChange(shiftWeek(weekStart, 1))}
+            aria-label="Semana siguiente"
+          >
+            <ChevronRightIcon />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Semana siguiente</TooltipContent>
+      </Tooltip>
+    </ButtonGroup>
   )
 }
 
@@ -520,6 +494,7 @@ export function LoansTable({
   const [dueSorting, setDueSorting] = useState<SortingState>([])
   const [paymentTarget, setPaymentTarget] =
     useState<WeeklyCollectionRow | null>(null)
+  const [searchExpanded, setSearchExpanded] = useState(false)
   const due = useWeeklyCollectionData({
     weekStart,
     search: dueSearch,
@@ -720,12 +695,17 @@ export function LoansTable({
           </TabsList>
           <div className="flex items-center gap-2">
             {activeTab === 'due' && (
-              <WeekPopover weekStart={weekStart} onChange={setWeekStart} />
+              <WeekNavigator
+                weekStart={weekStart}
+                onChange={setWeekStart}
+                showLabel={!searchExpanded}
+              />
             )}
             <ExpandableSearch
               value={searchValueByTab[activeTab]}
               onChange={setSearchByTab[activeTab]}
               placeholder="Buscar deudor..."
+              onExpandedChange={setSearchExpanded}
             />
             <DataTableColumnsMenu table={currentTable} />
             {toolbarActions}

@@ -12,14 +12,20 @@ type ExpandableSearchProps = {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  onExpandedChange?: (expanded: boolean) => void
 }
 
 export function ExpandableSearch({
   value,
   onChange,
   placeholder = 'Buscar...',
+  onExpandedChange,
 }: ExpandableSearchProps) {
-  const [expanded, setExpanded] = useState(value.length > 0)
+  const [expanded, setExpandedState] = useState(value.length > 0)
+  const setExpanded = (next: boolean) => {
+    setExpandedState(next)
+    onExpandedChange?.(next)
+  }
   const [local, setLocal] = useState(value)
   const inputRef = useRef<HTMLInputElement>(null)
 
